@@ -138,22 +138,22 @@ export default function Auth() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Deal Scenario Calculator</CardTitle>
-          <CardDescription>Sign in to access your deals</CardDescription>
+    <div className="flex min-h-screen items-center justify-center bg-background p-6 sm:p-8">
+      <Card className="w-full max-w-xl">
+        <CardHeader className="text-center pb-4 sm:pb-6">
+          <CardTitle className="text-2xl sm:text-3xl font-bold">Deal Scenario Calculator</CardTitle>
+          <CardDescription className="text-base">Sign in to access your deals</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
             
             <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div className="space-y-2">
+              <form onSubmit={handleSignIn} className="space-y-5 sm:space-y-6">
+                <div className="space-y-3">
                   <Label htmlFor="signin-email">Email</Label>
                   <Input
                     id="signin-email"
@@ -165,7 +165,7 @@ export default function Auth() {
                     autoComplete="email"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label htmlFor="signin-password">Password</Label>
                   <Input
                     id="signin-password"
@@ -198,14 +198,14 @@ export default function Auth() {
                 </Button>
               </form>
               
-              <div className="relative my-4">
+              <div className="relative my-6">
                 <Separator />
-                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground">
                   or
                 </span>
               </div>
               
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 <Button
                   type="button"
                   variant="outline"
@@ -250,8 +250,8 @@ export default function Auth() {
             </TabsContent>
             
             <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="space-y-2">
+              <form onSubmit={handleSignUp} className="space-y-5 sm:space-y-6">
+                <div className="space-y-3">
                   <Label htmlFor="signup-email">Email</Label>
                   <Input
                     id="signup-email"
@@ -263,7 +263,7 @@ export default function Auth() {
                     autoComplete="email"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label htmlFor="signup-password">Password</Label>
                   <Input
                     id="signup-password"
@@ -280,14 +280,14 @@ export default function Auth() {
                 </Button>
               </form>
               
-              <div className="relative my-4">
+              <div className="relative my-6">
                 <Separator />
-                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground">
                   or
                 </span>
               </div>
               
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 <Button
                   type="button"
                   variant="outline"

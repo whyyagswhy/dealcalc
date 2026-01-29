@@ -127,18 +127,18 @@ export function ScenarioCard({
   const isCustomer = viewMode === 'customer';
 
   return (
-    <Card className="min-w-scenario max-w-scenario flex-shrink-0">
-      <CardHeader className="pb-3">
+    <Card className="w-full sm:w-auto sm:min-w-[400px] sm:max-w-scenario flex-shrink-0">
+      <CardHeader className="pb-4 sm:pb-5">
         <div className="flex items-center justify-between gap-2">
           {isInternal ? (
             <Input
               value={scenarioName}
               onChange={(e) => setScenarioName(e.target.value)}
-              className="h-8 border-transparent bg-transparent text-lg font-semibold hover:border-input focus:border-input"
+              className="h-10 border-transparent bg-transparent text-lg sm:text-xl font-semibold hover:border-input focus:border-input"
               placeholder="Scenario name"
             />
           ) : (
-            <h3 className="text-lg font-semibold text-foreground">{scenarioName}</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground">{scenarioName}</h3>
           )}
           <div className="flex items-center gap-1">
             {isInternal && (
@@ -186,7 +186,7 @@ export function ScenarioCard({
         </div>
       </CardHeader>
       
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4 sm:space-y-5">
         {/* Scenario Summary - gradient KPI banner */}
         <ScenarioSummary
           lineItems={lineItems}
@@ -199,15 +199,15 @@ export function ScenarioCard({
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : lineItems.length === 0 && isInternal ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
+          <div className="py-8 text-center text-sm text-muted-foreground">
             No line items yet. Add your first product.
           </div>
         ) : lineItems.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
+          <div className="py-8 text-center text-sm text-muted-foreground">
             No products in this scenario.
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {lineItems.map((lineItem) => {
               const lineEffectiveDisplay = resolveDisplayMode(displayMode, scenario.display_override, lineItem.display_override);
               return isInternal ? (

@@ -220,24 +220,24 @@ export function LineItemRow({
 
   return (
     <div className={cn(
-      "rounded-lg border bg-card p-3 space-y-3 shadow-card",
+      "rounded-lg border bg-card p-4 sm:p-5 space-y-4 shadow-card",
       revenueType === 'net_new' 
         ? "border-l-4 border-l-primary border-border" 
         : "border-l-4 border-l-secondary border-border"
     )}>
       {/* Row 1: Product Name + Display Toggle */}
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <Label className="text-xs text-muted-foreground">Product</Label>
           <Input
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
             placeholder="e.g., Sales Cloud"
-            className="h-9"
+            className="h-10"
           />
         </div>
         {viewMode === 'internal' && (
-          <div className="pt-5">
+          <div className="pt-6">
             <DisplayModeToggle
               value={displayOverride}
               onChange={setDisplayOverride}
@@ -249,7 +249,7 @@ export function LineItemRow({
       </div>
 
       {/* Row 2: Price, Qty, Term */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
         <div>
           <Label className="text-xs text-muted-foreground">List Price/mo</Label>
           <Input
@@ -257,7 +257,7 @@ export function LineItemRow({
             value={listUnitPrice}
             onChange={(e) => handleListPriceChange(e.target.value)}
             placeholder="e.g., 150"
-            className="h-9"
+            className="h-10"
             min="0"
             step="0.01"
           />
@@ -269,7 +269,7 @@ export function LineItemRow({
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             placeholder="e.g., 25"
-            className="h-9"
+            className="h-10"
             min="0"
             step="1"
           />
@@ -281,7 +281,7 @@ export function LineItemRow({
             value={termMonths}
             onChange={(e) => setTermMonths(e.target.value)}
             placeholder="e.g., 12"
-            className="h-9"
+            className="h-10"
             min="1"
             step="1"
           />
@@ -289,7 +289,7 @@ export function LineItemRow({
       </div>
 
       {/* Row 3: Discount / Net Price - both fully editable */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <div>
           <Label className="text-xs text-muted-foreground">Discount %</Label>
           <Input
@@ -297,7 +297,7 @@ export function LineItemRow({
             value={discountPercent}
             onChange={(e) => handleDiscountChange(e.target.value)}
             placeholder="e.g., 20"
-            className="h-9"
+            className="h-10"
             min="0"
             max="100"
             step="0.1"
@@ -310,7 +310,7 @@ export function LineItemRow({
             value={netUnitPrice}
             onChange={(e) => handleNetChange(e.target.value)}
             placeholder="e.g., 120"
-            className="h-9"
+            className="h-10"
             min="0"
             step="0.01"
           />
@@ -333,7 +333,7 @@ export function LineItemRow({
       <div className="flex items-center justify-between gap-2">
         {viewMode === 'internal' && (
           <Select value={revenueType} onValueChange={(v) => setRevenueType(v as RevenueType)}>
-            <SelectTrigger className="h-9 w-[140px]">
+            <SelectTrigger className="h-10 w-[140px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -342,7 +342,7 @@ export function LineItemRow({
             </SelectContent>
           </Select>
         )}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {status === 'saving' && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           
           <DropdownMenu>
