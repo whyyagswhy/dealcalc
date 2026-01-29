@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { DealListItem } from '@/lib/types';
 
@@ -51,6 +51,6 @@ export function useDeals({ searchQuery = '' }: UseDealsOptions = {}) {
 }
 
 export function useInvalidateDeals() {
-  const queryClient = require('@tanstack/react-query').useQueryClient();
+  const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: ['deals'] });
 }
