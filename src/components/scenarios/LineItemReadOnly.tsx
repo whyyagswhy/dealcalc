@@ -27,43 +27,43 @@ export function LineItemReadOnly({ lineItem, displayMode }: LineItemReadOnlyProp
       "border-l-4 border-l-primary border-border"
     )}>
       {/* Product Name */}
-      <div className="font-medium text-foreground">
+      <div className="font-semibold text-foreground">
         {lineItem.product_name || 'Unnamed Product'}
       </div>
 
       {/* Summary Row */}
       <div className="grid grid-cols-4 gap-2 text-sm">
         <div>
-          <span className="text-muted-foreground">Qty</span>
-          <p className="font-medium">{lineItem.quantity}</p>
+          <span className="text-muted-foreground text-xs">Qty</span>
+          <p className="font-medium tabular-nums">{lineItem.quantity}</p>
         </div>
         <div>
-          <span className="text-muted-foreground">Term</span>
-          <p className="font-medium">{lineItem.term_months}mo</p>
+          <span className="text-muted-foreground text-xs">Term</span>
+          <p className="font-medium tabular-nums">{lineItem.term_months}mo</p>
         </div>
         <div>
-          <span className="text-muted-foreground">List{periodLabel}</span>
-          <p className="font-medium">{formatCurrency(displayList)}</p>
+          <span className="text-muted-foreground text-xs">List{periodLabel}</span>
+          <p className="font-medium tabular-nums">{formatCurrency(displayList)}</p>
         </div>
         <div>
-          <span className="text-muted-foreground">Net{periodLabel}</span>
-          <p className="font-medium text-primary">{formatCurrency(displayNet)}</p>
+          <span className="text-muted-foreground text-xs">Net{periodLabel}</span>
+          <p className="font-semibold text-primary tabular-nums">{formatCurrency(displayNet)}</p>
         </div>
       </div>
 
       {/* Discount & Term Totals */}
-      <div className="grid grid-cols-3 gap-2 text-sm border-t border-border pt-2">
+      <div className="grid grid-cols-3 gap-2 text-sm border-t border-divider pt-2">
         <div>
-          <span className="text-muted-foreground">Discount</span>
-          <p className="font-medium">{formatPercent(effectiveDiscount)}</p>
+          <span className="text-muted-foreground text-xs">Discount</span>
+          <p className="font-medium tabular-nums">{formatPercent(effectiveDiscount)}</p>
         </div>
         <div>
-          <span className="text-muted-foreground">Term List</span>
-          <p className="font-medium">{formatCurrency(calculations.listTerm)}</p>
+          <span className="text-muted-foreground text-xs">Term List</span>
+          <p className="font-medium tabular-nums">{formatCurrency(calculations.listTerm)}</p>
         </div>
         <div>
-          <span className="text-muted-foreground">Term Net</span>
-          <p className="font-medium text-primary">{formatCurrency(calculations.netTerm)}</p>
+          <span className="text-muted-foreground text-xs">Term Net</span>
+          <p className="font-semibold text-primary tabular-nums">{formatCurrency(calculations.netTerm)}</p>
         </div>
       </div>
     </div>

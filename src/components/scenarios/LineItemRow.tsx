@@ -220,7 +220,7 @@ export function LineItemRow({
 
   return (
     <div className={cn(
-      "rounded-lg border bg-card p-3 space-y-3",
+      "rounded-lg border bg-card p-3 space-y-3 shadow-card",
       revenueType === 'net_new' 
         ? "border-l-4 border-l-primary border-border" 
         : "border-l-4 border-l-secondary border-border"

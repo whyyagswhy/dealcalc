@@ -193,7 +193,7 @@ export default function Auth() {
                     Remember me on this device
                   </Label>
                 </div>
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                <Button type="submit" className="w-full min-h-[44px]" disabled={isSubmitting}>
                   {isSubmitting ? 'Signing in...' : 'Sign In'}
                 </Button>
               </form>
@@ -209,7 +209,7 @@ export default function Auth() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full"
+                  className="w-full min-h-[44px]"
                   onClick={handleGoogleSignIn}
                   disabled={isGoogleLoading || isAppleLoading}
                 >
@@ -237,7 +237,7 @@ export default function Auth() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full"
+                  className="w-full min-h-[44px]"
                   onClick={handleAppleSignIn}
                   disabled={isGoogleLoading || isAppleLoading}
                 >
@@ -275,7 +275,7 @@ export default function Auth() {
                     autoComplete="new-password"
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                <Button type="submit" className="w-full min-h-[44px]" disabled={isSubmitting}>
                   {isSubmitting ? 'Creating account...' : 'Create Account'}
                 </Button>
               </form>
@@ -291,7 +291,7 @@ export default function Auth() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full"
+                  className="w-full min-h-[44px]"
                   onClick={handleGoogleSignIn}
                   disabled={isGoogleLoading || isAppleLoading}
                 >
@@ -319,7 +319,7 @@ export default function Auth() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full"
+                  className="w-full min-h-[44px]"
                   onClick={handleAppleSignIn}
                   disabled={isGoogleLoading || isAppleLoading}
                 >
