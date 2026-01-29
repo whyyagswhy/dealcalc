@@ -78,8 +78,8 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-background p-6 sm:p-8">
+      <Card className="w-full max-w-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">
             {isSuccess ? 'Password Updated!' : 'Set New Password'}

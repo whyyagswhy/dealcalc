@@ -1,73 +1,160 @@
-# Welcome to your Lovable project
+# Deal Scenario Calculator
 
-## Project info
+A modern web application for sales teams to model, compare, and present pricing scenarios for customer deals.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Overview
 
-## How can I edit this code?
+Deal Scenario Calculator enables sales professionals to:
+- Create and manage customer deals with multiple pricing scenarios
+- Model different pricing structures with line items, discounts, and terms
+- Compare scenarios side-by-side to identify optimal pricing strategies
+- Export deal summaries as images or CSV files for stakeholder presentations
+- Track key metrics including ACV, blended discount, and total savings
 
-There are several ways of editing your application.
+## Features
 
-**Use Lovable**
+### Deal Management
+- Create, edit, and delete deals with automatic cloud sync
+- Search and filter deals by name
+- Paginated, virtualized list supporting 1000+ deals per user
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Scenario Modeling
+- Multiple scenarios per deal for A/B pricing comparison
+- Clone scenarios to quickly iterate on pricing options
+- Monthly/Annual display toggle at deal, scenario, and line-item levels
 
-Changes made via Lovable will be committed automatically to this repo.
+### Line Item Configuration
+- Flexible product pricing with quantity and term customization
+- Bidirectional discount calculation (edit discount % or net price)
+- Revenue type classification (Net New vs Add-on)
+- Existing volume tracking for add-on calculations
 
-**Use your preferred IDE**
+### View Modes
+- **Customer View**: Clean presentation for customer-facing discussions
+- **Internal View**: Full detail including revenue types, baseline metrics, and commissionable ACV
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Export Capabilities
+- PNG image export for presentations and emails
+- CSV export for spreadsheet analysis
+- Selective scenario export
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Security
+- User authentication with email/password and OAuth (Google, Apple)
+- Row-level security ensuring users only access their own data
+- No sensitive data exposed in client-side code
 
-Follow these steps:
+## Technology Stack
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- **Frontend**: React 18, TypeScript, Vite
+- **Styling**: Tailwind CSS, shadcn/ui components
+- **State Management**: TanStack Query (React Query)
+- **Backend**: Supabase (PostgreSQL + Auth + Edge Functions)
+- **Deployment**: Lovable Cloud
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## Architecture
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Database Schema
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```
+deals
+├── id (uuid, primary key)
+├── user_id (uuid, references auth.users)
+├── name (text)
+├── display_mode ('monthly' | 'annual')
+├── view_mode ('internal' | 'customer')
+├── enable_existing_volume (boolean)
+└── timestamps
+
+scenarios
+├── id (uuid, primary key)
+├── deal_id (uuid, references deals)
+├── name (text)
+├── position (integer, for ordering)
+├── display_override (nullable, 'monthly' | 'annual')
+├── compare_enabled (boolean)
+└── timestamps
+
+line_items
+├── id (uuid, primary key)
+├── scenario_id (uuid, references scenarios)
+├── product_name (text)
+├── list_unit_price (numeric)
+├── quantity (integer)
+├── term_months (integer)
+├── discount_percent (numeric, nullable)
+├── net_unit_price (numeric, nullable)
+├── revenue_type ('net_new' | 'add_on')
+├── display_override (nullable)
+├── existing_volume (integer, nullable)
+├── existing_net_price (numeric, nullable)
+├── existing_term_months (integer, nullable)
+└── timestamps
+```
+
+### Security Model
+
+All tables implement Row-Level Security (RLS) policies:
+- Users can only SELECT, INSERT, UPDATE, DELETE their own records
+- Foreign key constraints cascade deletes appropriately
+- No anonymous access; authentication required for all operations
+
+### Performance Optimizations
+
+- **Virtualized Lists**: Efficiently render large deal lists
+- **Debounced Autosave**: 500ms delay prevents excessive writes
+- **Query Caching**: 30-second stale time reduces redundant fetches
+- **Server-Side Pagination**: Loads deals in batches of 20
+
+## Development
+
+### Prerequisites
+
+- Node.js 18+ with npm or bun
+- Git
+
+### Local Setup
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd deal-scenario-calculator
+
+# Install dependencies
+npm install
+
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Environment Variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The application requires the following environment variables (automatically configured in Lovable Cloud):
 
-**Use GitHub Codespaces**
+- `VITE_SUPABASE_URL` - Supabase project URL
+- `VITE_SUPABASE_PUBLISHABLE_KEY` - Supabase anon key
+- `VITE_SUPABASE_PROJECT_ID` - Supabase project ID
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Testing
 
-## What technologies are used for this project?
+```bash
+# Run unit tests
+npm run test
 
-This project is built with:
+# Run tests with coverage
+npm run test -- --coverage
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Deployment
 
-## How can I deploy this project?
+The application is deployed via Lovable Cloud. Simply click "Publish" in the Lovable editor to deploy frontend changes. Backend changes (edge functions, database migrations) deploy automatically.
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## Contributing
 
-## Can I connect a custom domain to my Lovable project?
+1. Create a feature branch from `main`
+2. Make changes and test locally
+3. Push changes - they'll sync to Lovable automatically
+4. Create a pull request for review
 
-Yes, you can!
+## License
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Private - All rights reserved.
