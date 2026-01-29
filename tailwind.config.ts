@@ -20,9 +20,6 @@ export default {
       maxWidth: {
         "scenario": "680px",
       },
-      minWidth: {
-        "scenario": "440px",
-      },
       colors: {
         border: "hsl(var(--border))",
         divider: "hsl(var(--divider))",

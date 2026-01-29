@@ -91,8 +91,8 @@ export default function Deals() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card shadow-card">
-        <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-8">
-          <h1 className="text-xl font-semibold text-foreground">Deal Scenario Calculator</h1>
+        <div className="mx-auto flex h-16 sm:h-20 max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-8">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-foreground">Deal Scenario Calculator</h1>
           <div className="flex items-center gap-4">
             <span className="hidden text-sm text-muted-foreground sm:inline">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={signOut} className="min-h-[44px]">
@@ -104,15 +104,15 @@ export default function Deals() {
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12">
         {/* Empty State */}
         {isEmpty && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-6 rounded-full bg-muted p-6">
-              <Plus className="h-12 w-12 text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center py-16 sm:py-20 lg:py-24 text-center">
+            <div className="mb-8 rounded-full bg-muted p-8">
+              <Plus className="h-12 w-12 sm:h-14 sm:w-14 text-muted-foreground" />
             </div>
-            <h2 className="mb-2 text-2xl font-semibold text-foreground">No deals yet</h2>
-            <p className="mb-8 max-w-md text-muted-foreground">
+            <h2 className="mb-3 text-2xl sm:text-3xl font-semibold text-foreground">No deals yet</h2>
+            <p className="mb-10 max-w-lg text-base sm:text-lg text-muted-foreground">
               Create your first deal to start modeling and comparing pricing scenarios for your customers.
             </p>
             <Button size="lg" onClick={handleOpenCreateDialog} className="min-h-[44px] min-w-[200px]">
@@ -124,7 +124,7 @@ export default function Deals() {
 
         {/* Deals List */}
         {!isEmpty && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Search and Create */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="w-full sm:max-w-xs">

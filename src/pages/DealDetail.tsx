@@ -164,7 +164,7 @@ export default function DealDetail() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card shadow-card">
-        <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 sm:h-20 max-w-[1400px] items-center gap-4 sm:gap-6 px-4 sm:px-6 lg:px-8">
           <Button 
             variant="ghost" 
             size="sm" 
@@ -179,7 +179,7 @@ export default function DealDetail() {
             <Input
               value={dealName}
               onChange={(e) => setDealName(e.target.value)}
-              className="max-w-md border-transparent bg-transparent text-lg font-semibold hover:border-input focus:border-input"
+              className="max-w-md border-transparent bg-transparent text-lg sm:text-xl lg:text-2xl font-semibold hover:border-input focus:border-input"
               placeholder="Deal name"
             />
             <SaveStatusIndicator status={status} onRetry={retry} />
@@ -199,19 +199,19 @@ export default function DealDetail() {
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12">
         {scenariosLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : !hasScenarios ? (
           /* Empty State */
-          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-16 text-center bg-card">
-            <div className="mb-4 rounded-full bg-muted p-4">
-              <Plus className="h-8 w-8 text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-16 sm:py-20 text-center bg-card">
+            <div className="mb-6 rounded-full bg-muted p-6">
+              <Plus className="h-10 w-10 text-muted-foreground" />
             </div>
-            <h2 className="mb-2 text-xl font-semibold text-foreground">No scenarios yet</h2>
-            <p className="mb-6 max-w-md text-muted-foreground">
+            <h2 className="mb-3 text-xl sm:text-2xl font-semibold text-foreground">No scenarios yet</h2>
+            <p className="mb-8 max-w-lg text-muted-foreground">
               Add your first scenario to start building pricing options for this deal.
             </p>
             <Button 
@@ -229,9 +229,9 @@ export default function DealDetail() {
           </div>
         ) : (
           /* Scenarios List */
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">Scenarios</h2>
+              <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Scenarios</h2>
               <Button 
                 onClick={handleAddScenario} 
                 disabled={createScenario.isPending}
@@ -247,7 +247,7 @@ export default function DealDetail() {
               </Button>
             </div>
             
-            <div className="flex gap-4 overflow-x-auto pb-4">
+            <div className="flex gap-6 lg:gap-8 overflow-x-auto pb-6">
               {scenarios.map((scenario) => (
                 <ScenarioCard
                   key={scenario.id}

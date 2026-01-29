@@ -23,16 +23,16 @@ export function LineItemReadOnly({ lineItem, displayMode }: LineItemReadOnlyProp
 
   return (
     <div className={cn(
-      "rounded-lg border bg-card p-3 space-y-2",
+      "rounded-lg border bg-card p-4 sm:p-5 space-y-3",
       "border-l-4 border-l-primary border-border"
     )}>
       {/* Product Name */}
-      <div className="font-semibold text-foreground">
+      <div className="font-semibold text-foreground text-base">
         {lineItem.product_name || 'Unnamed Product'}
       </div>
 
       {/* Summary Row */}
-      <div className="grid grid-cols-4 gap-2 text-sm">
+      <div className="grid grid-cols-4 gap-3 text-sm">
         <div>
           <span className="text-muted-foreground text-xs">Qty</span>
           <p className="font-medium tabular-nums">{lineItem.quantity}</p>
@@ -52,7 +52,7 @@ export function LineItemReadOnly({ lineItem, displayMode }: LineItemReadOnlyProp
       </div>
 
       {/* Discount & Term Totals */}
-      <div className="grid grid-cols-3 gap-2 text-sm border-t border-divider pt-2">
+      <div className="grid grid-cols-3 gap-3 text-sm border-t border-divider pt-3">
         <div>
           <span className="text-muted-foreground text-xs">Discount</span>
           <p className="font-medium tabular-nums">{formatPercent(effectiveDiscount)}</p>
