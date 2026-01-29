@@ -74,7 +74,7 @@ export function ExportDialog({ deal, scenarios, lineItemsByScenario }: ExportDia
       link.href = dataUrl;
       link.click();
     } catch (error) {
-      console.error('Failed to export PNG:', error);
+      if (import.meta.env.DEV) console.error('Failed to export PNG:', error);
     } finally {
       setIsExporting(false);
     }

@@ -69,7 +69,7 @@ export default function Deals() {
       setIsCreateDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ['deals'] });
     } catch (error) {
-      console.error('Error creating deal:', error);
+      if (import.meta.env.DEV) console.error('Error creating deal:', error);
       toast({
         title: 'Error',
         description: 'Failed to create deal. Please try again.',
