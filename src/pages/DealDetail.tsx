@@ -184,6 +184,8 @@ export default function DealDetail() {
                   onUpdateName={(name) => handleUpdateScenarioName(scenario.id, name)}
                   onDelete={() => setDeleteScenarioId(scenario.id)}
                   allScenarios={scenarios}
+                  displayMode={deal.display_mode}
+                  viewMode={deal.view_mode}
                 />
               ))}
             </div>
