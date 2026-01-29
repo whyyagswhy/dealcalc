@@ -85,3 +85,86 @@ export function useDeleteScenario() {
     },
   });
 }
+
+export function useCloneScenario() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ scenario, dealId }: { scenario: Scenario; dealId: string }) => {
+      // First, get all line items for this scenario
+      const { data: lineItems, error: lineItemsError } = await supabase
+        .from('line_items')
+        .select('*')
+        .eq('scenario_id', scenario.id);
+      
+      if (lineItemsError) throw lineItemsError;
+
+      // Get the max position for the new scenario
+      const { data: allScenarios } = await supabase
+        .from('scenarios')
+        .select('position')
+        .eq('deal_id', dealId)
+        .order('position', { ascending: false })
+        .limit(1);
+      
+      const maxPosition = allScenarios?.[0]?.position ?? 0;
+
+      // Create the new scenario with "(Copy)" suffix
+      const { data: newScenario, error: scenarioError } = await supabase
+        .from('scenarios')
+        .insert({
+          deal_id: dealId,
+          name: `${scenario.name} (Copy)`,
+          position: maxPosition + 1,
+          display_override: scenario.display_override,
+        })
+        .select()
+        .single();
+      
+      if (scenarioError) throw scenarioError;
+
+      // Clone all line items to the new scenario
+      if (lineItems && lineItems.length > 0) {
+        const clonedLineItems = lineItems.map(({ id, created_at, updated_at, scenario_id, ...rest }) => ({
+          ...rest,
+          scenario_id: newScenario.id,
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('line_items')
+          .insert(clonedLineItems);
+        
+        if (insertError) throw insertError;
+      }
+
+      return newScenario as Scenario;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['scenarios', data.deal_id] });
+      queryClient.invalidateQueries({ queryKey: ['deals'] });
+      queryClient.invalidateQueries({ queryKey: ['deal', data.deal_id] });
+    },
+  });
+}
+
+export function useReorderScenarios() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ scenarios, dealId }: { scenarios: { id: string; position: number }[]; dealId: string }) => {
+      // Update all scenarios with new positions
+      const updates = scenarios.map(({ id, position }) => 
+        supabase
+          .from('scenarios')
+          .update({ position })
+          .eq('id', id)
+      );
+      
+      await Promise.all(updates);
+      return { dealId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['scenarios', data.dealId] });
+    },
+  });
+}

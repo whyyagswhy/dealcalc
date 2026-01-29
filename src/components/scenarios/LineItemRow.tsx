@@ -18,6 +18,7 @@ import {
 import { Trash2, Copy, MoreVertical, Loader2 } from 'lucide-react';
 import { useAutosave } from '@/hooks/useAutosave';
 import { useCloneLineItem } from '@/hooks/useLineItems';
+import { ExistingVolumeFields } from './ExistingVolumeFields';
 import { cn } from '@/lib/utils';
 import type { LineItem, Scenario, RevenueType } from '@/lib/types';
 
@@ -27,6 +28,8 @@ interface LineItemRowProps {
   onDelete: () => void;
   allScenarios: Scenario[];
   currentScenarioId: string;
+  showExistingVolume: boolean;
+  viewMode: 'internal' | 'customer';
 }
 
 type InputMode = 'discount' | 'net';
@@ -48,6 +51,8 @@ export function LineItemRow({
   onDelete, 
   allScenarios,
   currentScenarioId,
+  showExistingVolume,
+  viewMode,
 }: LineItemRowProps) {
   // Track if this is the initial mount for this specific line item
   const lineItemIdRef = useRef(lineItem.id);
@@ -68,9 +73,23 @@ export function LineItemRow({
   const [inputMode, setInputMode] = useState<InputMode>(
     lineItem.discount_percent !== null ? 'discount' : 'net'
   );
+  
+  // Existing volume fields (for add-ons)
+  const [existingVolume, setExistingVolume] = useState(
+    lineItem.existing_volume !== null ? lineItem.existing_volume.toString() : ''
+  );
+  const [existingNetPrice, setExistingNetPrice] = useState(
+    lineItem.existing_net_price !== null ? lineItem.existing_net_price.toString() : ''
+  );
+  const [existingTermMonths, setExistingTermMonths] = useState(
+    lineItem.existing_term_months !== null ? lineItem.existing_term_months.toString() : ''
+  );
 
   const cloneLineItem = useCloneLineItem();
   const otherScenarios = allScenarios.filter(s => s.id !== currentScenarioId);
+  
+  // Show baseline fields only for add-on lines in internal view with toggle enabled
+  const shouldShowBaseline = showExistingVolume && viewMode === 'internal' && revenueType === 'add_on';
 
   // Only sync from props when the line item ID changes (new item loaded)
   useEffect(() => {
@@ -88,9 +107,12 @@ export function LineItemRow({
       setNetUnitPrice(lineItem.net_unit_price !== null ? lineItem.net_unit_price.toString() : '');
       setRevenueType(lineItem.revenue_type);
       setInputMode(lineItem.discount_percent !== null ? 'discount' : 'net');
+      setExistingVolume(lineItem.existing_volume !== null ? lineItem.existing_volume.toString() : '');
+      setExistingNetPrice(lineItem.existing_net_price !== null ? lineItem.existing_net_price.toString() : '');
+      setExistingTermMonths(lineItem.existing_term_months !== null ? lineItem.existing_term_months.toString() : '');
       isInitializedRef.current = true;
     }
-  }, [lineItem.id, lineItem.product_name, lineItem.list_unit_price, lineItem.quantity, lineItem.term_months, lineItem.discount_percent, lineItem.net_unit_price, lineItem.revenue_type]);
+  }, [lineItem.id, lineItem.product_name, lineItem.list_unit_price, lineItem.quantity, lineItem.term_months, lineItem.discount_percent, lineItem.net_unit_price, lineItem.revenue_type, lineItem.existing_volume, lineItem.existing_net_price, lineItem.existing_term_months]);
 
   // Auto-compute: discount → net
   const handleDiscountChange = useCallback((value: string) => {
@@ -152,8 +174,11 @@ export function LineItemRow({
       discount_percent: discountPercent ? (parseFloatSafe(discountPercent) ?? 0) / 100 : null,
       net_unit_price: netUnitPrice ? parseFloatSafe(netUnitPrice) : null,
       revenue_type: revenueType,
+      existing_volume: existingVolume ? parseIntSafe(existingVolume) : null,
+      existing_net_price: existingNetPrice ? parseFloatSafe(existingNetPrice) : null,
+      existing_term_months: existingTermMonths ? parseIntSafe(existingTermMonths) : null,
     };
-  }, [productName, listUnitPrice, quantity, termMonths, discountPercent, netUnitPrice, revenueType]);
+  }, [productName, listUnitPrice, quantity, termMonths, discountPercent, netUnitPrice, revenueType, existingVolume, existingNetPrice, existingTermMonths]);
 
   // Check if local state differs from the original line item
   const hasChanges = useMemo(() => {
@@ -165,6 +190,9 @@ export function LineItemRow({
       discount_percent: lineItem.discount_percent,
       net_unit_price: lineItem.net_unit_price,
       revenue_type: lineItem.revenue_type,
+      existing_volume: lineItem.existing_volume,
+      existing_net_price: lineItem.existing_net_price,
+      existing_term_months: lineItem.existing_term_months,
     };
     
     const current = {
@@ -175,10 +203,13 @@ export function LineItemRow({
       discount_percent: discountPercent ? (parseFloatSafe(discountPercent) ?? 0) / 100 : null,
       net_unit_price: netUnitPrice ? parseFloatSafe(netUnitPrice) : null,
       revenue_type: revenueType,
+      existing_volume: existingVolume ? parseIntSafe(existingVolume) : null,
+      existing_net_price: existingNetPrice ? parseFloatSafe(existingNetPrice) : null,
+      existing_term_months: existingTermMonths ? parseIntSafe(existingTermMonths) : null,
     };
     
     return JSON.stringify(orig) !== JSON.stringify(current);
-  }, [lineItem, productName, listUnitPrice, quantity, termMonths, discountPercent, netUnitPrice, revenueType]);
+  }, [lineItem, productName, listUnitPrice, quantity, termMonths, discountPercent, netUnitPrice, revenueType, existingVolume, existingNetPrice, existingTermMonths]);
 
   const handleSave = useCallback(async () => {
     onUpdate(currentUpdates);
@@ -196,7 +227,12 @@ export function LineItemRow({
   };
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+    <div className={cn(
+      "rounded-lg border bg-card p-3 space-y-3",
+      revenueType === 'net_new' 
+        ? "border-l-4 border-l-primary border-border" 
+        : "border-l-4 border-l-secondary border-border"
+    )}>
       {/* Row 1: Product Name */}
       <div>
         <Label className="text-xs text-muted-foreground">Product</Label>
@@ -279,18 +315,31 @@ export function LineItemRow({
         </div>
       </div>
 
-      {/* Row 4: Revenue Type and Actions */}
-      <div className="flex items-center justify-between gap-2">
-        <Select value={revenueType} onValueChange={(v) => setRevenueType(v as RevenueType)}>
-          <SelectTrigger className="h-9 w-[140px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="net_new">Net New</SelectItem>
-            <SelectItem value="add_on">Add-on</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Row 4: Existing Volume (for add-ons in internal view) */}
+      {shouldShowBaseline && (
+        <ExistingVolumeFields
+          existingVolume={existingVolume}
+          existingNetPrice={existingNetPrice}
+          existingTermMonths={existingTermMonths}
+          onExistingVolumeChange={setExistingVolume}
+          onExistingNetPriceChange={setExistingNetPrice}
+          onExistingTermMonthsChange={setExistingTermMonths}
+        />
+      )}
 
+      {/* Row 5: Revenue Type and Actions */}
+      <div className="flex items-center justify-between gap-2">
+        {viewMode === 'internal' && (
+          <Select value={revenueType} onValueChange={(v) => setRevenueType(v as RevenueType)}>
+            <SelectTrigger className="h-9 w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="net_new">Net New</SelectItem>
+              <SelectItem value="add_on">Add-on</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <div className="flex items-center gap-1">
           {status === 'saving' && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           

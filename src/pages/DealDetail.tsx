@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDeal, useUpdateDeal } from '@/hooks/useDeal';
-import { useScenarios, useCreateScenario, useUpdateScenario, useDeleteScenario } from '@/hooks/useScenarios';
+import { useScenarios, useCreateScenario, useUpdateScenario, useDeleteScenario, useCloneScenario } from '@/hooks/useScenarios';
 import { useAutosave } from '@/hooks/useAutosave';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SaveStatusIndicator } from '@/components/deals/SaveStatusIndicator';
+import { DealSettings } from '@/components/deals/DealSettings';
 import { ScenarioCard } from '@/components/scenarios/ScenarioCard';
 import { ArrowLeft, Plus, Loader2 } from 'lucide-react';
+import type { Deal } from '@/lib/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +30,7 @@ export default function DealDetail() {
   const createScenario = useCreateScenario();
   const updateScenario = useUpdateScenario();
   const deleteScenario = useDeleteScenario();
+  const cloneScenario = useCloneScenario();
   
   const [dealName, setDealName] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
@@ -79,6 +82,11 @@ export default function DealDetail() {
     }
   };
 
+  const handleCloneScenario = async (scenario: typeof scenarios[0]) => {
+    if (!dealId) return;
+    await cloneScenario.mutateAsync({ scenario, dealId });
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -124,6 +132,11 @@ export default function DealDetail() {
             />
             <SaveStatusIndicator status={status} onRetry={retry} />
           </div>
+          
+          <DealSettings 
+            deal={deal} 
+            onUpdate={(updates: Partial<Deal>) => updateDeal.mutate({ id: dealId!, updates })} 
+          />
         </div>
       </header>
 
@@ -183,9 +196,11 @@ export default function DealDetail() {
                   scenario={scenario}
                   onUpdateName={(name) => handleUpdateScenarioName(scenario.id, name)}
                   onDelete={() => setDeleteScenarioId(scenario.id)}
+                  onClone={() => handleCloneScenario(scenario)}
                   allScenarios={scenarios}
                   displayMode={deal.display_mode}
                   viewMode={deal.view_mode}
+                  enableExistingVolume={deal.enable_existing_volume}
                 />
               ))}
             </div>

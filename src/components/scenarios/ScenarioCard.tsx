@@ -2,9 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Plus, Trash2, Loader2, Copy, MoreVertical } from 'lucide-react';
 import { useLineItems, useCreateLineItem, useDeleteLineItem, useUpdateLineItem } from '@/hooks/useLineItems';
 import { LineItemRow } from './LineItemRow';
+import { LineItemReadOnly } from './LineItemReadOnly';
 import { ScenarioSummary } from './ScenarioSummary';
 import { useAutosave } from '@/hooks/useAutosave';
 import { SaveStatusIndicator } from '@/components/deals/SaveStatusIndicator';
@@ -24,18 +31,22 @@ interface ScenarioCardProps {
   scenario: Scenario;
   onUpdateName: (name: string) => void;
   onDelete: () => void;
+  onClone: () => void;
   allScenarios: Scenario[];
   displayMode: DisplayMode;
   viewMode: ViewMode;
+  enableExistingVolume: boolean;
 }
 
 export function ScenarioCard({ 
   scenario, 
   onUpdateName, 
   onDelete, 
+  onClone,
   allScenarios,
   displayMode,
   viewMode,
+  enableExistingVolume,
 }: ScenarioCardProps) {
   const [scenarioName, setScenarioName] = useState(scenario.name);
   const [deleteLineItemId, setDeleteLineItemId] = useState<string | null>(null);
@@ -89,27 +100,44 @@ export function ScenarioCard({
     await updateLineItem.mutateAsync({ id, updates });
   };
 
+  const isInternal = viewMode === 'internal';
+
   return (
     <Card className="min-w-[350px] flex-shrink-0 sm:min-w-[400px]">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
-          <Input
-            value={scenarioName}
-            onChange={(e) => setScenarioName(e.target.value)}
-            className="h-8 border-transparent bg-transparent text-lg font-semibold hover:border-input focus:border-input"
-            placeholder="Scenario name"
-          />
-          <div className="flex items-center gap-2">
-            <SaveStatusIndicator status={nameStatus} onRetry={retryName} />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onDelete}
-              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+          {isInternal ? (
+            <Input
+              value={scenarioName}
+              onChange={(e) => setScenarioName(e.target.value)}
+              className="h-8 border-transparent bg-transparent text-lg font-semibold hover:border-input focus:border-input"
+              placeholder="Scenario name"
+            />
+          ) : (
+            <h3 className="text-lg font-semibold text-foreground">{scenarioName}</h3>
+          )}
+          {isInternal && (
+            <div className="flex items-center gap-1">
+              <SaveStatusIndicator status={nameStatus} onRetry={retryName} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={onClone}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Clone Scenario
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
       </CardHeader>
       
@@ -125,39 +153,55 @@ export function ScenarioCard({
           <div className="flex justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : lineItems.length === 0 ? (
+        ) : lineItems.length === 0 && isInternal ? (
           <div className="py-6 text-center text-sm text-muted-foreground">
             No line items yet. Add your first product.
+          </div>
+        ) : lineItems.length === 0 ? (
+          <div className="py-6 text-center text-sm text-muted-foreground">
+            No products in this scenario.
           </div>
         ) : (
           <div className="space-y-2">
             {lineItems.map((lineItem) => (
-              <LineItemRow
-                key={lineItem.id}
-                lineItem={lineItem}
-                onUpdate={(updates) => handleUpdateLineItem(lineItem.id, updates)}
-                onDelete={() => setDeleteLineItemId(lineItem.id)}
-                allScenarios={allScenarios}
-                currentScenarioId={scenario.id}
-              />
+              isInternal ? (
+                <LineItemRow
+                  key={lineItem.id}
+                  lineItem={lineItem}
+                  onUpdate={(updates) => handleUpdateLineItem(lineItem.id, updates)}
+                  onDelete={() => setDeleteLineItemId(lineItem.id)}
+                  allScenarios={allScenarios}
+                  currentScenarioId={scenario.id}
+                  showExistingVolume={enableExistingVolume}
+                  viewMode={viewMode}
+                />
+              ) : (
+                <LineItemReadOnly
+                  key={lineItem.id}
+                  lineItem={lineItem}
+                  displayMode={scenario.display_override ?? displayMode}
+                />
+              )
             ))}
           </div>
         )}
         
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleAddLineItem}
-          disabled={createLineItem.isPending}
-          className="w-full min-h-[44px]"
-        >
-          {createLineItem.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Plus className="mr-2 h-4 w-4" />
-          )}
-          Add Line Item
-        </Button>
+        {isInternal && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAddLineItem}
+            disabled={createLineItem.isPending}
+            className="w-full min-h-[44px]"
+          >
+            {createLineItem.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="mr-2 h-4 w-4" />
+            )}
+            Add Line Item
+          </Button>
+        )}
       </CardContent>
 
       <AlertDialog open={!!deleteLineItemId} onOpenChange={() => setDeleteLineItemId(null)}>
