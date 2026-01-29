@@ -19,7 +19,7 @@ export function ScenarioComparison({ scenarios, dealDisplayMode }: ScenarioCompa
   }
 
   return (
-    <Card className="border-primary/30 bg-primary/5">
+    <Card className="border-primary/30 bg-card">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">Scenario Comparison</CardTitle>
@@ -49,13 +49,13 @@ interface ComparisonViewProps {
 
 function ComparisonSummary({ scenarios, dealDisplayMode }: ComparisonViewProps) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto -mx-6 px-6">
+      <table className="w-full text-sm min-w-[400px]">
         <thead>
-          <tr className="border-b border-border">
-            <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Metric</th>
+          <tr className="border-b border-divider">
+            <th className="text-left py-2 pr-4 text-xs font-bold text-muted-foreground uppercase tracking-wide">Metric</th>
             {scenarios.map((scenario) => (
-              <th key={scenario.id} className="text-right py-2 px-2 font-medium">
+              <th key={scenario.id} className="text-right py-2 px-2 font-semibold text-foreground">
                 {scenario.name}
               </th>
             ))}
@@ -125,8 +125,14 @@ function ComparisonRows({ scenarios, dealDisplayMode }: ComparisonViewProps) {
   return (
     <>
       {metrics.map((metric, idx) => (
-        <tr key={metric.label} className="border-b border-border/50 last:border-0">
-          <td className="py-2 pr-4 text-muted-foreground">{metric.label}</td>
+        <tr 
+          key={metric.label} 
+          className={cn(
+            "border-b border-divider last:border-0 transition-colors hover:bg-muted/30",
+            metric.highlight && "bg-accent-soft/10"
+          )}
+        >
+          <td className="py-2.5 pr-4 text-muted-foreground font-medium">{metric.label}</td>
           {scenarioData.map((d) => {
             const value = metric.getValue(d);
             const numValue = metric.label === 'Blended Discount' 
@@ -140,9 +146,9 @@ function ComparisonRows({ scenarios, dealDisplayMode }: ComparisonViewProps) {
               <td 
                 key={d.scenario.id} 
                 className={cn(
-                  "text-right py-2 px-2",
-                  metric.highlight && "font-medium",
-                  isBest && metric.highlight && "text-primary font-semibold"
+                  "text-right py-2.5 px-2 tabular-nums",
+                  metric.highlight && "font-semibold",
+                  isBest && metric.highlight && "text-primary font-bold"
                 )}
               >
                 {value}
@@ -184,38 +190,38 @@ function ComparisonDetailed({ scenarios, dealDisplayMode }: ComparisonViewProps)
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto -mx-6 px-6">
+      <table className="w-full text-sm min-w-[400px]">
         <thead>
-          <tr className="border-b border-border">
-            <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Product</th>
+          <tr className="border-b border-divider">
+            <th className="text-left py-2 pr-4 text-xs font-bold text-muted-foreground uppercase tracking-wide">Product</th>
             {scenarios.map((scenario) => (
-              <th key={scenario.id} className="text-right py-2 px-2 font-medium" colSpan={2}>
+              <th key={scenario.id} className="text-right py-2 px-2 font-semibold text-foreground" colSpan={2}>
                 {scenario.name}
               </th>
             ))}
           </tr>
-          <tr className="border-b border-border text-xs text-muted-foreground">
-            <th className="text-left py-1 pr-4"></th>
+          <tr className="border-b border-divider text-xs text-muted-foreground">
+            <th className="text-left py-1.5 pr-4"></th>
             {scenarios.map((scenario) => (
               <>
-                <th key={`${scenario.id}-qty`} className="text-right py-1 px-2">Qty</th>
-                <th key={`${scenario.id}-net`} className="text-right py-1 px-2">Net{isMonthly ? '/mo' : '/yr'}</th>
+                <th key={`${scenario.id}-qty`} className="text-right py-1.5 px-2 font-medium">Qty</th>
+                <th key={`${scenario.id}-net`} className="text-right py-1.5 px-2 font-medium">Net{isMonthly ? '/mo' : '/yr'}</th>
               </>
             ))}
           </tr>
         </thead>
         <tbody>
           {productNames.map((product) => (
-            <tr key={product} className="border-b border-border/50 last:border-0">
-              <td className="py-2 pr-4">{product}</td>
+            <tr key={product} className="border-b border-divider last:border-0 transition-colors hover:bg-muted/30">
+              <td className="py-2.5 pr-4 font-medium">{product}</td>
               {scenarioData.map(({ scenario, lineItems }) => {
                 const item = lineItems.find((li) => li.product_name === product);
                 if (!item) {
                   return (
                     <>
-                      <td key={`${scenario.id}-${product}-qty`} className="text-right py-2 px-2 text-muted-foreground">—</td>
-                      <td key={`${scenario.id}-${product}-net`} className="text-right py-2 px-2 text-muted-foreground">—</td>
+                      <td key={`${scenario.id}-${product}-qty`} className="text-right py-2.5 px-2 text-muted-foreground tabular-nums">—</td>
+                      <td key={`${scenario.id}-${product}-net`} className="text-right py-2.5 px-2 text-muted-foreground tabular-nums">—</td>
                     </>
                   );
                 }
@@ -225,8 +231,8 @@ function ComparisonDetailed({ scenarios, dealDisplayMode }: ComparisonViewProps)
                 
                 return (
                   <>
-                    <td key={`${scenario.id}-${product}-qty`} className="text-right py-2 px-2">{item.quantity}</td>
-                    <td key={`${scenario.id}-${product}-net`} className="text-right py-2 px-2 font-medium">
+                    <td key={`${scenario.id}-${product}-qty`} className="text-right py-2.5 px-2 tabular-nums">{item.quantity}</td>
+                    <td key={`${scenario.id}-${product}-net`} className="text-right py-2.5 px-2 font-semibold tabular-nums">
                       {formatCurrency(displayNet)}
                     </td>
                   </>

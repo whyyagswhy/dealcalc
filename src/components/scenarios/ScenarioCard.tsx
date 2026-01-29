@@ -127,7 +127,7 @@ export function ScenarioCard({
   const isCustomer = viewMode === 'customer';
 
   return (
-    <Card className="min-w-[350px] flex-shrink-0 sm:min-w-[400px]">
+    <Card className="min-w-scenario max-w-scenario flex-shrink-0">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
           {isInternal ? (
@@ -187,7 +187,7 @@ export function ScenarioCard({
       </CardHeader>
       
       <CardContent className="space-y-3">
-        {/* Scenario Summary - sticky header */}
+        {/* Scenario Summary - gradient KPI banner */}
         <ScenarioSummary
           lineItems={lineItems}
           displayMode={effectiveDisplayMode}

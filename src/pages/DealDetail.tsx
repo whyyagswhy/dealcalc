@@ -163,13 +163,13 @@ export default function DealDetail() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
+      <header className="border-b border-border bg-card shadow-card">
+        <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 sm:px-6 lg:px-8">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => navigate('/')}
-            className="shrink-0"
+            className="shrink-0 min-h-[44px] min-w-[44px]"
           >
             <ArrowLeft className="h-4 w-4" />
             <span className="ml-2 hidden sm:inline">Back</span>
@@ -199,14 +199,14 @@ export default function DealDetail() {
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
         {scenariosLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : !hasScenarios ? (
           /* Empty State */
-          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-16 text-center">
+          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-16 text-center bg-card">
             <div className="mb-4 rounded-full bg-muted p-4">
               <Plus className="h-8 w-8 text-muted-foreground" />
             </div>
