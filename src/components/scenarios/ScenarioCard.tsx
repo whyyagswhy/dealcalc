@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,8 +15,10 @@ import { useLineItems, useCreateLineItem, useDeleteLineItem, useUpdateLineItem }
 import { LineItemRow } from './LineItemRow';
 import { LineItemReadOnly } from './LineItemReadOnly';
 import { ScenarioSummary } from './ScenarioSummary';
+import { DisplayModeToggle } from './DisplayModeToggle';
 import { useAutosave } from '@/hooks/useAutosave';
 import { SaveStatusIndicator } from '@/components/deals/SaveStatusIndicator';
+import { resolveDisplayMode } from '@/lib/types';
 import type { Scenario, LineItem, DisplayMode, ViewMode } from '@/lib/types';
 import {
   AlertDialog,
@@ -30,6 +34,7 @@ import {
 interface ScenarioCardProps {
   scenario: Scenario;
   onUpdateName: (name: string) => void;
+  onUpdateScenario: (updates: Partial<Scenario>) => void;
   onDelete: () => void;
   onClone: () => void;
   allScenarios: Scenario[];
@@ -40,7 +45,8 @@ interface ScenarioCardProps {
 
 export function ScenarioCard({ 
   scenario, 
-  onUpdateName, 
+  onUpdateName,
+  onUpdateScenario,
   onDelete, 
   onClone,
   allScenarios,
@@ -50,15 +56,22 @@ export function ScenarioCard({
 }: ScenarioCardProps) {
   const [scenarioName, setScenarioName] = useState(scenario.name);
   const [deleteLineItemId, setDeleteLineItemId] = useState<string | null>(null);
+  const [localDisplayOverride, setLocalDisplayOverride] = useState<DisplayMode | null>(scenario.display_override);
+  const [localCompareEnabled, setLocalCompareEnabled] = useState(scenario.compare_enabled);
   
   const { data: lineItems = [], isLoading } = useLineItems(scenario.id);
   const createLineItem = useCreateLineItem();
   const deleteLineItem = useDeleteLineItem();
   const updateLineItem = useUpdateLineItem();
 
+  // Effective display mode for this scenario
+  const effectiveDisplayMode = resolveDisplayMode(displayMode, scenario.display_override);
+
   useEffect(() => {
     setScenarioName(scenario.name);
-  }, [scenario.name]);
+    setLocalDisplayOverride(scenario.display_override);
+    setLocalCompareEnabled(scenario.compare_enabled);
+  }, [scenario.name, scenario.display_override, scenario.compare_enabled]);
 
   const handleSaveName = useCallback(async (name: string) => {
     if (name.trim() && name !== scenario.name) {
@@ -72,6 +85,16 @@ export function ScenarioCard({
     delay: 400,
     enabled: scenarioName !== scenario.name && scenarioName.trim().length > 0,
   });
+
+  const handleDisplayOverrideChange = (value: DisplayMode | null) => {
+    setLocalDisplayOverride(value);
+    onUpdateScenario({ display_override: value });
+  };
+
+  const handleCompareEnabledChange = (checked: boolean) => {
+    setLocalCompareEnabled(checked);
+    onUpdateScenario({ compare_enabled: checked });
+  };
 
   const handleAddLineItem = async () => {
     const maxPosition = lineItems.length > 0 
@@ -101,6 +124,7 @@ export function ScenarioCard({
   };
 
   const isInternal = viewMode === 'internal';
+  const isCustomer = viewMode === 'customer';
 
   return (
     <Card className="min-w-[350px] flex-shrink-0 sm:min-w-[400px]">
@@ -116,28 +140,49 @@ export function ScenarioCard({
           ) : (
             <h3 className="text-lg font-semibold text-foreground">{scenarioName}</h3>
           )}
-          {isInternal && (
-            <div className="flex items-center gap-1">
-              <SaveStatusIndicator status={nameStatus} onRetry={retryName} />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={onClone}>
-                    <Copy className="mr-2 h-4 w-4" />
-                    Clone Scenario
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          )}
+          <div className="flex items-center gap-1">
+            {isInternal && (
+              <>
+                <DisplayModeToggle
+                  value={localDisplayOverride}
+                  onChange={handleDisplayOverrideChange}
+                  inheritedValue={displayMode}
+                  size="xs"
+                />
+                <SaveStatusIndicator status={nameStatus} onRetry={retryName} />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={onClone}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Clone Scenario
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
+            {isCustomer && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor={`compare-${scenario.id}`} className="text-xs text-muted-foreground">
+                  Compare
+                </Label>
+                <Switch
+                  id={`compare-${scenario.id}`}
+                  checked={localCompareEnabled}
+                  onCheckedChange={handleCompareEnabledChange}
+                  className="scale-75"
+                />
+              </div>
+            )}
+          </div>
         </div>
       </CardHeader>
       
@@ -145,7 +190,7 @@ export function ScenarioCard({
         {/* Scenario Summary - sticky header */}
         <ScenarioSummary
           lineItems={lineItems}
-          displayMode={scenario.display_override ?? displayMode}
+          displayMode={effectiveDisplayMode}
           viewMode={viewMode}
         />
         
@@ -163,8 +208,9 @@ export function ScenarioCard({
           </div>
         ) : (
           <div className="space-y-2">
-            {lineItems.map((lineItem) => (
-              isInternal ? (
+            {lineItems.map((lineItem) => {
+              const lineEffectiveDisplay = resolveDisplayMode(displayMode, scenario.display_override, lineItem.display_override);
+              return isInternal ? (
                 <LineItemRow
                   key={lineItem.id}
                   lineItem={lineItem}
@@ -174,15 +220,16 @@ export function ScenarioCard({
                   currentScenarioId={scenario.id}
                   showExistingVolume={enableExistingVolume}
                   viewMode={viewMode}
+                  effectiveDisplayMode={effectiveDisplayMode}
                 />
               ) : (
                 <LineItemReadOnly
                   key={lineItem.id}
                   lineItem={lineItem}
-                  displayMode={scenario.display_override ?? displayMode}
+                  displayMode={lineEffectiveDisplay}
                 />
-              )
-            ))}
+              );
+            })}
           </div>
         )}
         

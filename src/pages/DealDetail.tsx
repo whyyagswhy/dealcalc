@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDeal, useUpdateDeal } from '@/hooks/useDeal';
 import { useScenarios, useCreateScenario, useUpdateScenario, useDeleteScenario, useCloneScenario } from '@/hooks/useScenarios';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { SaveStatusIndicator } from '@/components/deals/SaveStatusIndicator';
 import { DealSettings } from '@/components/deals/DealSettings';
 import { ScenarioCard } from '@/components/scenarios/ScenarioCard';
+import { ScenarioComparison } from '@/components/scenarios/ScenarioComparison';
 import { ArrowLeft, Plus, Loader2 } from 'lucide-react';
 import type { Deal } from '@/lib/types';
 import {
@@ -56,6 +57,11 @@ export default function DealDetail() {
     enabled: isInitialized && dealName !== deal?.name,
   });
 
+  // Scenarios selected for comparison (in customer view) - must be before early returns
+  const comparisonScenarios = useMemo(() => {
+    return scenarios.filter(s => s.compare_enabled);
+  }, [scenarios]);
+
   const handleAddScenario = async () => {
     if (!dealId) return;
     
@@ -73,6 +79,10 @@ export default function DealDetail() {
 
   const handleUpdateScenarioName = async (scenarioId: string, name: string) => {
     await updateScenario.mutateAsync({ id: scenarioId, updates: { name } });
+  };
+
+  const handleUpdateScenario = async (scenarioId: string, updates: Partial<typeof scenarios[0]>) => {
+    await updateScenario.mutateAsync({ id: scenarioId, updates });
   };
 
   const handleDeleteScenario = async () => {
@@ -107,6 +117,7 @@ export default function DealDetail() {
   }
 
   const hasScenarios = scenarios.length > 0;
+  const showComparison = deal.view_mode === 'customer' && comparisonScenarios.length >= 2;
 
   return (
     <div className="min-h-screen bg-background">
@@ -195,6 +206,7 @@ export default function DealDetail() {
                   key={scenario.id}
                   scenario={scenario}
                   onUpdateName={(name) => handleUpdateScenarioName(scenario.id, name)}
+                  onUpdateScenario={(updates) => handleUpdateScenario(scenario.id, updates)}
                   onDelete={() => setDeleteScenarioId(scenario.id)}
                   onClone={() => handleCloneScenario(scenario)}
                   allScenarios={scenarios}
@@ -204,6 +216,14 @@ export default function DealDetail() {
                 />
               ))}
             </div>
+            
+            {/* Comparison Section */}
+            {showComparison && (
+              <ScenarioComparison 
+                scenarios={comparisonScenarios} 
+                dealDisplayMode={deal.display_mode}
+              />
+            )}
           </div>
         )}
       </main>
