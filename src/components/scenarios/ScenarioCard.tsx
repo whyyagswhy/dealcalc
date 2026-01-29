@@ -5,9 +5,10 @@ import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { useLineItems, useCreateLineItem, useDeleteLineItem, useUpdateLineItem } from '@/hooks/useLineItems';
 import { LineItemRow } from './LineItemRow';
+import { ScenarioSummary } from './ScenarioSummary';
 import { useAutosave } from '@/hooks/useAutosave';
 import { SaveStatusIndicator } from '@/components/deals/SaveStatusIndicator';
-import type { Scenario, LineItem } from '@/lib/types';
+import type { Scenario, LineItem, DisplayMode, ViewMode } from '@/lib/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,9 +25,18 @@ interface ScenarioCardProps {
   onUpdateName: (name: string) => void;
   onDelete: () => void;
   allScenarios: Scenario[];
+  displayMode: DisplayMode;
+  viewMode: ViewMode;
 }
 
-export function ScenarioCard({ scenario, onUpdateName, onDelete, allScenarios }: ScenarioCardProps) {
+export function ScenarioCard({ 
+  scenario, 
+  onUpdateName, 
+  onDelete, 
+  allScenarios,
+  displayMode,
+  viewMode,
+}: ScenarioCardProps) {
   const [scenarioName, setScenarioName] = useState(scenario.name);
   const [deleteLineItemId, setDeleteLineItemId] = useState<string | null>(null);
   
@@ -104,6 +114,13 @@ export function ScenarioCard({ scenario, onUpdateName, onDelete, allScenarios }:
       </CardHeader>
       
       <CardContent className="space-y-3">
+        {/* Scenario Summary - sticky header */}
+        <ScenarioSummary
+          lineItems={lineItems}
+          displayMode={scenario.display_override ?? displayMode}
+          viewMode={viewMode}
+        />
+        
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
