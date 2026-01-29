@@ -5,6 +5,7 @@ import { lovable } from '@/integrations/lovable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
@@ -23,6 +24,7 @@ export default function Auth() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const { user, isLoading, signIn, signUp } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
@@ -53,7 +55,7 @@ export default function Auth() {
     if (!validateForm()) return;
     
     setIsSubmitting(true);
-    const { error } = await signIn(email, password);
+    const { error } = await signIn(email, password, rememberMe);
     setIsSubmitting(false);
 
     if (error) {
@@ -174,9 +176,22 @@ export default function Auth() {
                     required
                     autoComplete="current-password"
                   />
-                  <div className="flex justify-end">
+                  <div className="flex items-center justify-between">
                     <ForgotPasswordDialog />
                   </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="remember-me"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked === true)}
+                  />
+                  <Label
+                    htmlFor="remember-me"
+                    className="text-sm font-normal text-muted-foreground cursor-pointer"
+                  >
+                    Remember me on this device
+                  </Label>
                 </div>
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? 'Signing in...' : 'Sign In'}

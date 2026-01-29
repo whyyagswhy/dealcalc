@@ -2,12 +2,15 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+// Storage key for remember me preference
+const REMEMBER_ME_KEY = 'auth_remember_me';
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
@@ -54,11 +57,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+  const signIn = async (email: string, password: string, rememberMe: boolean = true) => {
+    // Store the remember me preference
+    if (rememberMe) {
+      localStorage.setItem(REMEMBER_ME_KEY, 'true');
+    } else {
+      localStorage.removeItem(REMEMBER_ME_KEY);
+      // If not remembering, we'll clear the session when the browser closes
+      // by moving the session to sessionStorage after sign in
+    }
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    
+    // If not remembering and sign-in succeeded, copy session to sessionStorage
+    // and set up cleanup on page unload
+    if (!rememberMe && data.session && !error) {
+      sessionStorage.setItem('sb-session-temp', JSON.stringify(data.session));
+      
+      // Clear localStorage session on page unload if not remembering
+      const handleUnload = () => {
+        localStorage.removeItem(`sb-${import.meta.env.VITE_SUPABASE_PROJECT_ID}-auth-token`);
+      };
+      window.addEventListener('beforeunload', handleUnload);
+    }
     
     return { error: error as Error | null };
   };
