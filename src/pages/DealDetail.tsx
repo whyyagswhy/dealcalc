@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDeal, useUpdateDeal } from '@/hooks/useDeal';
 import { useScenarios, useCreateScenario, useUpdateScenario, useDeleteScenario, useCloneScenario } from '@/hooks/useScenarios';
+import { useCreateLineItem } from '@/hooks/useLineItems';
 import { useAutosave } from '@/hooks/useAutosave';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SaveStatusIndicator } from '@/components/deals/SaveStatusIndicator';
 import { DealSettings } from '@/components/deals/DealSettings';
+import { ImportContractDialog } from '@/components/deals/ImportContractDialog';
 import { ScenarioCard } from '@/components/scenarios/ScenarioCard';
 import { ScenarioComparison } from '@/components/scenarios/ScenarioComparison';
 import { ArrowLeft, Plus, Loader2 } from 'lucide-react';
@@ -32,6 +34,7 @@ export default function DealDetail() {
   const updateScenario = useUpdateScenario();
   const deleteScenario = useDeleteScenario();
   const cloneScenario = useCloneScenario();
+  const createLineItem = useCreateLineItem();
   
   const [dealName, setDealName] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
@@ -97,6 +100,44 @@ export default function DealDetail() {
     await cloneScenario.mutateAsync({ scenario, dealId });
   };
 
+  const handleImportContract = async (lineItems: Array<{
+    product_name: string;
+    list_unit_price: number;
+    quantity: number;
+    term_months: number;
+    discount_percent: number | null;
+    net_unit_price: number | null;
+  }>) => {
+    if (!dealId) return;
+    
+    // Create "Current Contract" scenario
+    const maxPosition = scenarios.length > 0 
+      ? Math.max(...scenarios.map(s => s.position)) + 1 
+      : 0;
+    
+    const newScenario = await createScenario.mutateAsync({
+      deal_id: dealId,
+      name: 'Current Contract',
+      position: maxPosition,
+    });
+
+    // Create line items for this scenario
+    for (let i = 0; i < lineItems.length; i++) {
+      const item = lineItems[i];
+      await createLineItem.mutateAsync({
+        scenario_id: newScenario.id,
+        product_name: item.product_name,
+        list_unit_price: item.list_unit_price,
+        quantity: item.quantity,
+        term_months: item.term_months,
+        discount_percent: item.discount_percent,
+        net_unit_price: item.net_unit_price,
+        revenue_type: 'net_new',
+        position: i,
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -144,10 +185,16 @@ export default function DealDetail() {
             <SaveStatusIndicator status={status} onRetry={retry} />
           </div>
           
-          <DealSettings 
-            deal={deal} 
-            onUpdate={(updates: Partial<Deal>) => updateDeal.mutate({ id: dealId!, updates })} 
-          />
+          <div className="flex items-center gap-2">
+            <ImportContractDialog 
+              dealId={dealId!} 
+              onImportComplete={handleImportContract} 
+            />
+            <DealSettings 
+              deal={deal} 
+              onUpdate={(updates: Partial<Deal>) => updateDeal.mutate({ id: dealId!, updates })} 
+            />
+          </div>
         </div>
       </header>
 
