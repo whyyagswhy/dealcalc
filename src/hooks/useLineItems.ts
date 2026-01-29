@@ -57,8 +57,43 @@ export function useUpdateLineItem() {
       if (error) throw error;
       return data as LineItem;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['lineItems', data.scenario_id] });
+    onMutate: async ({ id, updates }) => {
+      // Get the scenario ID from the update or find it in existing data
+      const queries = queryClient.getQueriesData<LineItem[]>({ queryKey: ['lineItems'] });
+      let scenarioId: string | undefined;
+      
+      for (const [, data] of queries) {
+        const item = data?.find(li => li.id === id);
+        if (item) {
+          scenarioId = item.scenario_id;
+          break;
+        }
+      }
+      
+      if (scenarioId) {
+        // Cancel any outgoing refetches
+        await queryClient.cancelQueries({ queryKey: ['lineItems', scenarioId] });
+        
+        // Optimistically update the cache
+        queryClient.setQueryData<LineItem[]>(['lineItems', scenarioId], (old) => {
+          if (!old) return old;
+          return old.map(item => 
+            item.id === id ? { ...item, ...updates, updated_at: new Date().toISOString() } : item
+          );
+        });
+      }
+      
+      return { scenarioId };
+    },
+    onError: (_error, _variables, context) => {
+      // Rollback on error by refetching
+      if (context?.scenarioId) {
+        queryClient.invalidateQueries({ queryKey: ['lineItems', context.scenarioId] });
+      }
+    },
+    // Don't invalidate on success - we already updated optimistically
+    onSuccess: () => {
+      // No-op: optimistic update already applied
     },
   });
 }

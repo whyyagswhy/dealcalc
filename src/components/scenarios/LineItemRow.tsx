@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -31,6 +31,17 @@ interface LineItemRowProps {
 
 type InputMode = 'discount' | 'net';
 
+// Parse helpers
+const parseFloatSafe = (value: string): number | null => {
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? null : parsed;
+};
+
+const parseIntSafe = (value: string): number | null => {
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? null : parsed;
+};
+
 export function LineItemRow({ 
   lineItem, 
   onUpdate, 
@@ -38,6 +49,11 @@ export function LineItemRow({
   allScenarios,
   currentScenarioId,
 }: LineItemRowProps) {
+  // Track if this is the initial mount for this specific line item
+  const lineItemIdRef = useRef(lineItem.id);
+  const isInitializedRef = useRef(false);
+  
+  // Local state for form fields
   const [productName, setProductName] = useState(lineItem.product_name);
   const [listUnitPrice, setListUnitPrice] = useState(lineItem.list_unit_price.toString());
   const [quantity, setQuantity] = useState(lineItem.quantity.toString());
@@ -56,86 +72,123 @@ export function LineItemRow({
   const cloneLineItem = useCloneLineItem();
   const otherScenarios = allScenarios.filter(s => s.id !== currentScenarioId);
 
-  // Sync state when lineItem changes
+  // Only sync from props when the line item ID changes (new item loaded)
   useEffect(() => {
-    setProductName(lineItem.product_name);
-    setListUnitPrice(lineItem.list_unit_price.toString());
-    setQuantity(lineItem.quantity.toString());
-    setTermMonths(lineItem.term_months.toString());
-    setDiscountPercent(lineItem.discount_percent !== null ? (lineItem.discount_percent * 100).toString() : '');
-    setNetUnitPrice(lineItem.net_unit_price !== null ? lineItem.net_unit_price.toString() : '');
-    setRevenueType(lineItem.revenue_type);
-  }, [lineItem]);
+    if (lineItemIdRef.current !== lineItem.id) {
+      lineItemIdRef.current = lineItem.id;
+      isInitializedRef.current = false;
+    }
+    
+    if (!isInitializedRef.current) {
+      setProductName(lineItem.product_name);
+      setListUnitPrice(lineItem.list_unit_price.toString());
+      setQuantity(lineItem.quantity.toString());
+      setTermMonths(lineItem.term_months.toString());
+      setDiscountPercent(lineItem.discount_percent !== null ? (lineItem.discount_percent * 100).toString() : '');
+      setNetUnitPrice(lineItem.net_unit_price !== null ? lineItem.net_unit_price.toString() : '');
+      setRevenueType(lineItem.revenue_type);
+      setInputMode(lineItem.discount_percent !== null ? 'discount' : 'net');
+      isInitializedRef.current = true;
+    }
+  }, [lineItem.id, lineItem.product_name, lineItem.list_unit_price, lineItem.quantity, lineItem.term_months, lineItem.discount_percent, lineItem.net_unit_price, lineItem.revenue_type]);
 
   // Auto-compute: discount → net
-  const handleDiscountChange = (value: string) => {
+  const handleDiscountChange = useCallback((value: string) => {
     setDiscountPercent(value);
     setInputMode('discount');
     
-    const discount = parseFloat(value) / 100;
-    const list = parseFloat(listUnitPrice);
+    const discount = parseFloatSafe(value);
+    const list = parseFloatSafe(listUnitPrice);
     
-    if (!isNaN(discount) && !isNaN(list) && discount >= 0 && discount <= 100) {
-      const net = list * (1 - discount);
+    if (discount !== null && list !== null && discount >= 0 && discount <= 100) {
+      const net = list * (1 - discount / 100);
       setNetUnitPrice(net.toFixed(2));
     }
-  };
+  }, [listUnitPrice]);
 
   // Auto-compute: net → discount
-  const handleNetChange = (value: string) => {
+  const handleNetChange = useCallback((value: string) => {
     setNetUnitPrice(value);
     setInputMode('net');
     
-    const net = parseFloat(value);
-    const list = parseFloat(listUnitPrice);
+    const net = parseFloatSafe(value);
+    const list = parseFloatSafe(listUnitPrice);
     
-    if (!isNaN(net) && !isNaN(list) && list > 0) {
+    if (net !== null && list !== null && list > 0) {
       const discount = ((list - net) / list) * 100;
       setDiscountPercent(discount.toFixed(1));
     }
-  };
+  }, [listUnitPrice]);
 
   // Recalculate when list price changes
-  useEffect(() => {
-    const list = parseFloat(listUnitPrice);
-    if (isNaN(list) || list <= 0) return;
+  const handleListPriceChange = useCallback((value: string) => {
+    setListUnitPrice(value);
+    
+    const list = parseFloatSafe(value);
+    if (list === null || list <= 0) return;
 
     if (inputMode === 'discount') {
-      const discount = parseFloat(discountPercent) / 100;
-      if (!isNaN(discount)) {
-        const net = list * (1 - discount);
+      const discount = parseFloatSafe(discountPercent);
+      if (discount !== null) {
+        const net = list * (1 - discount / 100);
         setNetUnitPrice(net.toFixed(2));
       }
     } else {
-      const net = parseFloat(netUnitPrice);
-      if (!isNaN(net)) {
+      const net = parseFloatSafe(netUnitPrice);
+      if (net !== null) {
         const discount = ((list - net) / list) * 100;
         setDiscountPercent(discount.toFixed(1));
       }
     }
-  }, [listUnitPrice]);
+  }, [inputMode, discountPercent, netUnitPrice]);
 
-  const getCurrentUpdates = useCallback((): Partial<LineItem> => {
+  // Build the update object - memoized to prevent unnecessary re-renders
+  const currentUpdates = useMemo((): Partial<LineItem> => {
     return {
       product_name: productName,
-      list_unit_price: parseFloat(listUnitPrice) || 0,
-      quantity: parseInt(quantity) || 0,
-      term_months: parseInt(termMonths) || 12,
-      discount_percent: discountPercent ? parseFloat(discountPercent) / 100 : null,
-      net_unit_price: netUnitPrice ? parseFloat(netUnitPrice) : null,
+      list_unit_price: parseFloatSafe(listUnitPrice) ?? 0,
+      quantity: parseIntSafe(quantity) ?? 0,
+      term_months: parseIntSafe(termMonths) ?? 12,
+      discount_percent: discountPercent ? (parseFloatSafe(discountPercent) ?? 0) / 100 : null,
+      net_unit_price: netUnitPrice ? parseFloatSafe(netUnitPrice) : null,
       revenue_type: revenueType,
     };
   }, [productName, listUnitPrice, quantity, termMonths, discountPercent, netUnitPrice, revenueType]);
 
+  // Check if local state differs from the original line item
+  const hasChanges = useMemo(() => {
+    const orig = {
+      product_name: lineItem.product_name,
+      list_unit_price: lineItem.list_unit_price,
+      quantity: lineItem.quantity,
+      term_months: lineItem.term_months,
+      discount_percent: lineItem.discount_percent,
+      net_unit_price: lineItem.net_unit_price,
+      revenue_type: lineItem.revenue_type,
+    };
+    
+    const current = {
+      product_name: productName,
+      list_unit_price: parseFloatSafe(listUnitPrice) ?? 0,
+      quantity: parseIntSafe(quantity) ?? 0,
+      term_months: parseIntSafe(termMonths) ?? 12,
+      discount_percent: discountPercent ? (parseFloatSafe(discountPercent) ?? 0) / 100 : null,
+      net_unit_price: netUnitPrice ? parseFloatSafe(netUnitPrice) : null,
+      revenue_type: revenueType,
+    };
+    
+    return JSON.stringify(orig) !== JSON.stringify(current);
+  }, [lineItem, productName, listUnitPrice, quantity, termMonths, discountPercent, netUnitPrice, revenueType]);
+
   const handleSave = useCallback(async () => {
-    onUpdate(getCurrentUpdates());
-  }, [onUpdate, getCurrentUpdates]);
+    onUpdate(currentUpdates);
+  }, [onUpdate, currentUpdates]);
 
   const { status } = useAutosave({
-    data: getCurrentUpdates(),
+    data: currentUpdates,
     onSave: handleSave,
-    delay: 400,
-    enabled: true,
+    delay: 500,
+    enabled: hasChanges && isInitializedRef.current,
   });
 
   const handleCopyToScenario = async (targetScenarioId: string) => {
@@ -162,7 +215,7 @@ export function LineItemRow({
           <Input
             type="number"
             value={listUnitPrice}
-            onChange={(e) => setListUnitPrice(e.target.value)}
+            onChange={(e) => handleListPriceChange(e.target.value)}
             placeholder="e.g., 150"
             className="h-9"
             min="0"
