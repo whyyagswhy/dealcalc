@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "@/pages/Auth";
 import Deals from "@/pages/Deals";
+import DealDetail from "@/pages/DealDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Deals />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/deals/:dealId"
+              element={
+                <ProtectedRoute>
+                  <DealDetail />
                 </ProtectedRoute>
               }
             />

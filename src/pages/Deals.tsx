@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDeals } from '@/hooks/useDeals';
+import { useDebounce } from '@/hooks/useDebounce';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,16 +13,38 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { LogOut, Plus, Loader2 } from 'lucide-react';
+import { LogOut, Plus, Loader2, Search, X, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { DealsList } from '@/components/deals/DealsList';
+import { SearchInput } from '@/components/deals/SearchInput';
 
 export default function Deals() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [dealName, setDealName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const debouncedSearch = useDebounce(searchQuery, 300);
+  
+  const {
+    data,
+    isLoading,
+    isError,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    refetch,
+  } = useDeals({ searchQuery: debouncedSearch });
+
+  const deals = useMemo(() => {
+    return data?.pages.flatMap((page) => page.deals) || [];
+  }, [data]);
 
   const handleCreateDeal = async () => {
     if (!dealName.trim() || !user) return;
@@ -43,7 +67,7 @@ export default function Deals() {
       
       setDealName('');
       setIsCreateDialogOpen(false);
-      // TODO: Navigate to deal detail page or refresh list
+      queryClient.invalidateQueries({ queryKey: ['deals'] });
     } catch (error) {
       console.error('Error creating deal:', error);
       toast({
@@ -59,6 +83,9 @@ export default function Deals() {
   const handleOpenCreateDialog = () => {
     setIsCreateDialogOpen(true);
   };
+
+  const isEmpty = !isLoading && deals.length === 0 && !searchQuery;
+  const noResults = !isLoading && deals.length === 0 && searchQuery;
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,21 +104,83 @@ export default function Deals() {
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Empty State */}
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mb-6 rounded-full bg-muted p-6">
-            <Plus className="h-12 w-12 text-muted-foreground" />
+        {isEmpty && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="mb-6 rounded-full bg-muted p-6">
+              <Plus className="h-12 w-12 text-muted-foreground" />
+            </div>
+            <h2 className="mb-2 text-2xl font-semibold text-foreground">No deals yet</h2>
+            <p className="mb-8 max-w-md text-muted-foreground">
+              Create your first deal to start modeling and comparing pricing scenarios for your customers.
+            </p>
+            <Button size="lg" onClick={handleOpenCreateDialog} className="min-h-[44px] min-w-[200px]">
+              <Plus className="mr-2 h-5 w-5" />
+              Create Your First Deal
+            </Button>
           </div>
-          <h2 className="mb-2 text-2xl font-semibold text-foreground">No deals yet</h2>
-          <p className="mb-8 max-w-md text-muted-foreground">
-            Create your first deal to start modeling and comparing pricing scenarios for your customers.
-          </p>
-          <Button size="lg" onClick={handleOpenCreateDialog} className="min-h-[44px] min-w-[200px]">
-            <Plus className="mr-2 h-5 w-5" />
-            Create Your First Deal
-          </Button>
-        </div>
+        )}
+
+        {/* Deals List */}
+        {!isEmpty && (
+          <div className="space-y-4">
+            {/* Search and Create */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="w-full sm:max-w-xs">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search deals..."
+                />
+              </div>
+              <Button onClick={handleOpenCreateDialog} className="min-h-[44px]">
+                <Plus className="mr-2 h-4 w-4" />
+                New Deal
+              </Button>
+            </div>
+
+            {/* Loading State */}
+            {isLoading && (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {/* Error State */}
+            {isError && (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <p className="mb-4 text-destructive">Failed to load deals</p>
+                <Button variant="outline" onClick={() => refetch()}>
+                  Try Again
+                </Button>
+              </div>
+            )}
+
+            {/* No Search Results */}
+            {noResults && (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="mb-4 rounded-full bg-muted p-4">
+                  <Search className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <p className="mb-2 text-lg font-medium text-foreground">No deals found</p>
+                <p className="text-muted-foreground">
+                  No deals match "{searchQuery}". Try a different search.
+                </p>
+              </div>
+            )}
+
+            {/* Deals List */}
+            {!isLoading && !isError && deals.length > 0 && (
+              <DealsList
+                deals={deals}
+                hasNextPage={hasNextPage || false}
+                isFetchingNextPage={isFetchingNextPage}
+                fetchNextPage={fetchNextPage}
+              />
+            )}
+          </div>
+        )}
       </main>
 
       {/* Create Deal Dialog */}
