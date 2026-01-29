@@ -201,6 +201,7 @@ describe('Scenario Aggregate Calculations', () => {
     existing_volume: null,
     existing_net_price: null,
     existing_term_months: null,
+    display_override: null,
     position: 0,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

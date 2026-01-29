@@ -54,6 +54,7 @@ export type Database = {
         Row: {
           created_at: string
           discount_percent: number | null
+          display_override: string | null
           existing_net_price: number | null
           existing_term_months: number | null
           existing_volume: number | null
@@ -71,6 +72,7 @@ export type Database = {
         Insert: {
           created_at?: string
           discount_percent?: number | null
+          display_override?: string | null
           existing_net_price?: number | null
           existing_term_months?: number | null
           existing_volume?: number | null
@@ -88,6 +90,7 @@ export type Database = {
         Update: {
           created_at?: string
           discount_percent?: number | null
+          display_override?: string | null
           existing_net_price?: number | null
           existing_term_months?: number | null
           existing_volume?: number | null
@@ -114,6 +117,7 @@ export type Database = {
       }
       scenarios: {
         Row: {
+          compare_enabled: boolean
           created_at: string
           deal_id: string
           display_override: string | null
@@ -123,6 +127,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          compare_enabled?: boolean
           created_at?: string
           deal_id: string
           display_override?: string | null
@@ -132,6 +137,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          compare_enabled?: boolean
           created_at?: string
           deal_id?: string
           display_override?: string | null

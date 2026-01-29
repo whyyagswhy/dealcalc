@@ -22,6 +22,7 @@ export interface Scenario {
   name: string;
   position: number;
   display_override: DisplayMode | null;
+  compare_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +40,7 @@ export interface LineItem {
   existing_volume: number | null;
   existing_net_price: number | null;
   existing_term_months: number | null;
+  display_override: DisplayMode | null;
   position: number;
   created_at: string;
   updated_at: string;
@@ -46,9 +48,9 @@ export interface LineItem {
 
 // For creating new records (omit auto-generated fields)
 export type CreateDeal = Pick<Deal, 'user_id' | 'name'> & Partial<Pick<Deal, 'display_mode' | 'view_mode' | 'enable_existing_volume'>>;
-export type CreateScenario = Pick<Scenario, 'deal_id' | 'name'> & Partial<Pick<Scenario, 'position' | 'display_override'>>;
+export type CreateScenario = Pick<Scenario, 'deal_id' | 'name'> & Partial<Pick<Scenario, 'position' | 'display_override' | 'compare_enabled'>>;
 export type CreateLineItem = Pick<LineItem, 'scenario_id' | 'product_name' | 'list_unit_price' | 'quantity' | 'revenue_type'> & 
-  Partial<Pick<LineItem, 'term_months' | 'discount_percent' | 'net_unit_price' | 'existing_volume' | 'existing_net_price' | 'existing_term_months' | 'position'>>;
+  Partial<Pick<LineItem, 'term_months' | 'discount_percent' | 'net_unit_price' | 'existing_volume' | 'existing_net_price' | 'existing_term_months' | 'position' | 'display_override'>>;
 
 // For deal list view (minimal columns for performance)
 export interface DealListItem {
@@ -56,4 +58,19 @@ export interface DealListItem {
   name: string;
   updated_at: string;
   scenario_count: number;
+}
+
+// Helper to resolve display mode hierarchy: lineItem > scenario > deal
+export function resolveDisplayMode(
+  dealDisplayMode: DisplayMode,
+  scenarioDisplayOverride: DisplayMode | null,
+  lineItemDisplayOverride?: DisplayMode | null
+): DisplayMode {
+  if (lineItemDisplayOverride !== null && lineItemDisplayOverride !== undefined) {
+    return lineItemDisplayOverride;
+  }
+  if (scenarioDisplayOverride !== null) {
+    return scenarioDisplayOverride;
+  }
+  return dealDisplayMode;
 }
