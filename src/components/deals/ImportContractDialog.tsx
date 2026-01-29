@@ -39,6 +39,8 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
   const [open, setOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [isPdf, setIsPdf] = useState(false);
   const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null);
   const [editableItems, setEditableItems] = useState<ExtractedLineItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -49,21 +51,26 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file (PNG, JPG, etc.)');
+    // Validate file type (images and PDFs)
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    
+    if (!isImage && !isPdf) {
+      setError('Please select an image (PNG, JPG) or PDF file');
       return;
     }
 
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      setError('Image size must be less than 10MB');
+      setError('File size must be less than 10MB');
       return;
     }
 
     setError(null);
     setExtractionResult(null);
     setEditableItems([]);
+    setFileName(file.name);
+    setIsPdf(isPdf);
 
     // Create preview and base64
     const reader = new FileReader();
@@ -82,7 +89,7 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke('extract-contract', {
-        body: { image_base64: preview },
+        body: { file_base64: preview },
       });
 
       if (fnError) {
@@ -167,6 +174,8 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
   const handleClose = () => {
     setOpen(false);
     setPreview(null);
+    setFileName(null);
+    setIsPdf(false);
     setExtractionResult(null);
     setEditableItems([]);
     setError(null);
@@ -217,7 +226,7 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf,application/pdf"
               onChange={handleFileSelect}
               className="hidden"
               id="contract-image-upload"
@@ -229,23 +238,33 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
                 className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
               >
                 <Upload className="h-10 w-10 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">Click to upload contract screenshot</p>
-                <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 10MB</p>
+                <p className="text-sm text-muted-foreground">Click to upload contract</p>
+                <p className="text-xs text-muted-foreground mt-1">PNG, JPG, or PDF up to 10MB</p>
               </label>
             ) : (
               <div className="w-full space-y-3">
                 <div className="relative">
-                  <img
-                    src={preview}
-                    alt="Contract preview"
-                    className="w-full max-h-48 object-contain rounded-lg border border-border"
-                  />
+                  {isPdf ? (
+                    <div className="flex flex-col items-center justify-center w-full h-32 bg-muted rounded-lg border border-border">
+                      <FileImage className="h-12 w-12 text-muted-foreground mb-2" />
+                      <p className="text-sm font-medium text-foreground">{fileName}</p>
+                      <p className="text-xs text-muted-foreground">PDF Document</p>
+                    </div>
+                  ) : (
+                    <img
+                      src={preview}
+                      alt="Contract preview"
+                      className="w-full max-h-48 object-contain rounded-lg border border-border"
+                    />
+                  )}
                   <Button
                     variant="secondary"
                     size="sm"
                     className="absolute top-2 right-2"
                     onClick={() => {
                       setPreview(null);
+                      setFileName(null);
+                      setIsPdf(false);
                       setExtractionResult(null);
                       setEditableItems([]);
                       setError(null);

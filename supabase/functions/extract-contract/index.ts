@@ -20,6 +20,20 @@ interface ExtractionResult {
   notes: string;
 }
 
+// Detect file type from data URL or base64
+function detectFileType(dataUrl: string): { mimeType: string; isSupported: boolean } {
+  if (dataUrl.startsWith('data:')) {
+    const match = dataUrl.match(/^data:([^;,]+)/);
+    if (match) {
+      const mimeType = match[1];
+      const isSupported = mimeType.startsWith('image/') || mimeType === 'application/pdf';
+      return { mimeType, isSupported };
+    }
+  }
+  // Default to image/png for raw base64
+  return { mimeType: 'image/png', isSupported: true };
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -27,11 +41,11 @@ serve(async (req) => {
   }
 
   try {
-    const { image_base64 } = await req.json();
+    const { file_base64 } = await req.json();
 
-    if (!image_base64) {
+    if (!file_base64) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Image data is required' }),
+        JSON.stringify({ success: false, error: 'File data is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -45,12 +59,23 @@ serve(async (req) => {
       );
     }
 
-    console.log('Processing contract image for extraction...');
+    // Detect file type
+    const { mimeType, isSupported } = detectFileType(file_base64);
+    
+    if (!isSupported) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unsupported file type. Please upload an image or PDF.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Prepare the image URL (handle both data URL and raw base64)
-    const imageUrl = image_base64.startsWith('data:') 
-      ? image_base64 
-      : `data:image/png;base64,${image_base64}`;
+    const isPdf = mimeType === 'application/pdf';
+    console.log(`Processing contract ${isPdf ? 'PDF' : 'image'} for extraction...`);
+
+    // Prepare the file URL (handle both data URL and raw base64)
+    const fileUrl = file_base64.startsWith('data:') 
+      ? file_base64 
+      : `data:${mimeType};base64,${file_base64}`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -90,7 +115,7 @@ Important:
               },
               {
                 type: 'image_url',
-                image_url: { url: imageUrl }
+                image_url: { url: fileUrl }
               }
             ]
           }
