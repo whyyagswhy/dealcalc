@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { ForgotPasswordDialog } from '@/components/auth/ForgotPasswordDialog';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
@@ -173,6 +174,9 @@ export default function Auth() {
                     required
                     autoComplete="current-password"
                   />
+                  <div className="flex justify-end">
+                    <ForgotPasswordDialog />
+                  </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? 'Signing in...' : 'Sign In'}
