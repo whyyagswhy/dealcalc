@@ -1,9 +1,64 @@
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { LogOut, Plus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { LogOut, Plus, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Deals() {
   const { user, signOut } = useAuth();
+  const { toast } = useToast();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [dealName, setDealName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleCreateDeal = async () => {
+    if (!dealName.trim() || !user) return;
+    
+    setIsCreating(true);
+    try {
+      const { error } = await supabase
+        .from('deals')
+        .insert({
+          user_id: user.id,
+          name: dealName.trim(),
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Deal Created',
+        description: `"${dealName}" has been created successfully.`,
+      });
+      
+      setDealName('');
+      setIsCreateDialogOpen(false);
+      // TODO: Navigate to deal detail page or refresh list
+    } catch (error) {
+      console.error('Error creating deal:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create deal. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleOpenCreateDialog = () => {
+    setIsCreateDialogOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -12,7 +67,7 @@ export default function Deals() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <h1 className="text-xl font-semibold text-foreground">Deal Scenario Calculator</h1>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{user?.email}</span>
+            <span className="hidden text-sm text-muted-foreground sm:inline">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={signOut}>
               <LogOut className="h-4 w-4" />
               <span className="ml-2 hidden sm:inline">Sign Out</span>
@@ -32,12 +87,64 @@ export default function Deals() {
           <p className="mb-8 max-w-md text-muted-foreground">
             Create your first deal to start modeling and comparing pricing scenarios for your customers.
           </p>
-          <Button size="lg">
+          <Button size="lg" onClick={handleOpenCreateDialog} className="min-h-[44px] min-w-[200px]">
             <Plus className="mr-2 h-5 w-5" />
             Create Your First Deal
           </Button>
         </div>
       </main>
+
+      {/* Create Deal Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Deal</DialogTitle>
+            <DialogDescription>
+              Enter a name for your new deal. You can add scenarios and line items after creation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="deal-name">Deal Name</Label>
+              <Input
+                id="deal-name"
+                placeholder="e.g., Acme Corp - Enterprise License"
+                value={dealName}
+                onChange={(e) => setDealName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && dealName.trim()) {
+                    handleCreateDeal();
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsCreateDialogOpen(false)}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateDeal} 
+              disabled={!dealName.trim() || isCreating}
+              className="min-h-[44px]"
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Deal'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
