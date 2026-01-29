@@ -247,7 +247,7 @@ export default function DealDetail() {
               </Button>
             </div>
             
-            <div className="flex gap-6 lg:gap-8 overflow-x-auto pb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6 lg:gap-8">
               {scenarios.map((scenario) => (
                 <ScenarioCard
                   key={scenario.id}

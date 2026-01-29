@@ -33,37 +33,13 @@ export function ScenarioSummary({
   return (
     <div 
       className={cn(
-        "sticky top-0 z-10 rounded-lg p-5 md:p-6 lg:p-8",
+        "sticky top-0 z-10 rounded-lg p-4 sm:p-5 lg:p-6",
         "bg-gradient-to-r from-[hsl(var(--grad-start))] to-[hsl(var(--grad-end))]",
         className
       )}
     >
-      {/* Desktop: horizontal layout with dividers */}
-      <div className="hidden md:flex md:items-center md:justify-between md:gap-6 lg:gap-8">
-        <KpiBlock label={`List${periodLabel}`} value={formatCurrency(displayList)} />
-        <Divider />
-        <KpiBlock label={`Net${periodLabel}`} value={formatCurrency(displayNet)} />
-        <Divider />
-        <KpiBlock label="Term List" value={formatCurrency(totals.listTerm)} />
-        <Divider />
-        <KpiBlock label="Term Net" value={formatCurrency(totals.netTerm)} />
-        <Divider />
-        <KpiBlock label="Savings" value={formatCurrency(totals.totalSavings)} />
-        <Divider />
-        <KpiBlock label="Discount" value={formatPercent(totals.blendedDiscount)} />
-        
-        {isInternal && (
-          <>
-            <Divider />
-            <KpiBlock label="Comm. ACV" value={formatCurrency(totals.totalCommissionableACV)} />
-            <Divider />
-            <KpiBlock label="Total ACV" value={formatCurrency(totals.totalACV)} />
-          </>
-        )}
-      </div>
-
-      {/* Mobile: 2x2 grid layout */}
-      <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:hidden">
+      {/* Responsive grid that adapts to container width */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3">
         <KpiBlock label={`List${periodLabel}`} value={formatCurrency(displayList)} />
         <KpiBlock label={`Net${periodLabel}`} value={formatCurrency(displayNet)} />
         <KpiBlock label="Term List" value={formatCurrency(totals.listTerm)} />
@@ -85,14 +61,10 @@ export function ScenarioSummary({
 function KpiBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col items-center text-center min-w-0">
-      <span className="text-xs md:text-sm font-semibold text-white/75 uppercase tracking-wide">{label}</span>
-      <span className="text-2xl md:text-3xl lg:text-4xl font-extrabold text-white tabular-nums truncate">
+      <span className="text-xs font-semibold text-white/75 uppercase tracking-wide">{label}</span>
+      <span className="text-lg sm:text-xl lg:text-2xl font-extrabold text-white tabular-nums truncate">
         {value}
       </span>
     </div>
   );
-}
-
-function Divider() {
-  return <div className="hidden md:block w-px h-12 bg-white/20 shrink-0" />;
 }

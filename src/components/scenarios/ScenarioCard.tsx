@@ -127,7 +127,7 @@ export function ScenarioCard({
   const isCustomer = viewMode === 'customer';
 
   return (
-    <Card className="w-full sm:w-auto sm:min-w-[400px] sm:max-w-scenario flex-shrink-0">
+    <Card className="w-full flex-1 min-w-0">
       <CardHeader className="pb-4 sm:pb-5">
         <div className="flex items-center justify-between gap-2">
           {isInternal ? (
