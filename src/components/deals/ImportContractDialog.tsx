@@ -108,7 +108,7 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
         setError('No line items could be extracted from this image. Try a clearer screenshot.');
       }
     } catch (err) {
-      console.error('Extraction error:', err);
+      if (import.meta.env.DEV) console.error('Extraction error:', err);
       setError(err instanceof Error ? err.message : 'Failed to extract contract data');
     } finally {
       setIsProcessing(false);
@@ -160,10 +160,10 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
       });
       handleClose();
     } catch (err) {
-      console.error('Import error:', err);
+      if (import.meta.env.DEV) console.error('Import error:', err);
       toast({
         title: 'Import failed',
-        description: err instanceof Error ? err.message : 'Failed to create scenario',
+        description: 'Failed to create scenario. Please try again.',
         variant: 'destructive',
       });
     } finally {

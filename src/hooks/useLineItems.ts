@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { LineItem, CreateLineItem } from '@/lib/types';
+import { validateLineItemUpdate } from '@/lib/validations';
 
 export function useLineItems(scenarioId: string | undefined) {
   return useQuery({
@@ -27,6 +28,21 @@ export function useCreateLineItem() {
 
   return useMutation({
     mutationFn: async (lineItem: CreateLineItem) => {
+      // Validate numeric fields before submission
+      const validation = validateLineItemUpdate({
+        product_name: lineItem.product_name,
+        list_unit_price: lineItem.list_unit_price,
+        quantity: lineItem.quantity,
+        term_months: lineItem.term_months ?? 12,
+        discount_percent: lineItem.discount_percent,
+        net_unit_price: lineItem.net_unit_price,
+        revenue_type: lineItem.revenue_type,
+      });
+
+      if (!validation.success) {
+        throw new Error(validation.errors?.join(', ') || 'Invalid line item data');
+      }
+
       const { data, error } = await supabase
         .from('line_items')
         .insert(lineItem)
@@ -47,6 +63,12 @@ export function useUpdateLineItem() {
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<LineItem> }) => {
+      // Validate updates before submission
+      const validation = validateLineItemUpdate(updates);
+      if (!validation.success) {
+        throw new Error(validation.errors?.join(', ') || 'Invalid line item data');
+      }
+
       const { data, error } = await supabase
         .from('line_items')
         .update(updates)
