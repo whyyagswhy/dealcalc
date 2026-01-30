@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/admin/AdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useDiscountMatrixSeeder } from "@/hooks/useDiscountMatrixSeeder";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 // Lazy load route components for code splitting
 const Auth = lazy(() => import("@/pages/Auth"));
@@ -90,6 +91,7 @@ const App = () => (
             </Suspense>
           </AuthProvider>
         </BrowserRouter>
+        <SpeedInsights />
       </ErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
