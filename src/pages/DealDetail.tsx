@@ -164,18 +164,18 @@ export default function DealDetail() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card shadow-card">
-        <div className="mx-auto flex h-16 sm:h-20 max-w-[1400px] items-center gap-4 sm:gap-6 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 sm:h-20 max-w-[1400px] items-center px-4 sm:px-6 lg:px-8">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => navigate('/')}
-            className="shrink-0 min-h-[44px] min-w-[44px]"
+            className="shrink-0 min-h-[44px] min-w-[44px] mr-4"
           >
             <ArrowLeft className="h-4 w-4" />
             <span className="ml-2 hidden sm:inline">Back</span>
           </Button>
           
-          <div className="flex flex-1 items-center gap-4 min-w-0">
+          <div className="flex flex-1 items-center gap-3 min-w-0">
             <Input
               value={dealName}
               onChange={(e) => setDealName(e.target.value)}
@@ -185,7 +185,7 @@ export default function DealDetail() {
             <SaveStatusIndicator status={status} onRetry={retry} />
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 ml-4">
             <ImportContractDialog 
               dealId={dealId!} 
               onImportComplete={handleImportContract} 
