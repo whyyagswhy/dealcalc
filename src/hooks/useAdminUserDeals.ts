@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { QUERY_STALE_TIME } from '@/lib/constants';
 
 export interface AdminUserDeal {
   id: string;
@@ -25,11 +26,20 @@ export function useAdminUserDeals(targetUserId: string) {
         _target_user_id: targetUserId,
       });
 
-      if (error) throw error;
+      if (error) {
+        if (import.meta.env.DEV) {
+          console.error('Error fetching admin user deals:', error);
+        }
+        throw error;
+      }
 
       return (data || []) as AdminUserDeal[];
     },
     enabled: !!user && !!targetUserId,
-    staleTime: 30000,
+    staleTime: QUERY_STALE_TIME.SHORT,
+    retry: (failureCount, error) => {
+      if ((error as { code?: string })?.code === 'P0001') return false;
+      return failureCount < 2;
+    },
   });
 }
