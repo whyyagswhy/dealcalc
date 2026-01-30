@@ -1,23 +1,23 @@
-import { useState, useEffect, useMemo } from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Pencil } from 'lucide-react';
-import { usePriceBook, type PriceBookProduct } from '@/hooks/usePriceBook';
+import { Pencil, Search, Check, ChevronDown, X } from 'lucide-react';
+import { usePriceBook } from '@/hooks/usePriceBook';
 import { 
-  groupProductsByCategory, 
   parseDiscountMatrixName, 
   buildDiscountMatrixName,
   getPriceForSelection,
-  type CategoryGroup 
+  searchProducts,
+  getDiscountMatrixName,
+  type SearchResult,
 } from '@/lib/productMapping';
+import { cn } from '@/lib/utils';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface HierarchicalProductPickerProps {
   /** Current product name in discount matrix format: "[Edition] Category" */
@@ -35,99 +35,39 @@ export function HierarchicalProductPicker({
 }: HierarchicalProductPickerProps) {
   const { data: products, isLoading } = usePriceBook();
   
-  // Parse the current value to extract category and edition
-  const parsed = useMemo(() => parseDiscountMatrixName(value), [value]);
-  
-  const [selectedCategory, setSelectedCategory] = useState<string>(parsed.category || '');
-  const [selectedEdition, setSelectedEdition] = useState<string | null>(parsed.edition);
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [customName, setCustomName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
   
-  // Group products by category
-  const categoryGroups = useMemo(() => {
+  // Parse the current value
+  const parsed = useMemo(() => parseDiscountMatrixName(value), [value]);
+  
+  // Get display name for the current value
+  const displayValue = useMemo(() => {
+    if (!value) return '';
+    if (parsed.edition) {
+      return `${parsed.category} - ${parsed.edition}`;
+    }
+    return parsed.category;
+  }, [value, parsed]);
+  
+  // Search results
+  const searchResults = useMemo(() => {
     if (!products) return [];
-    return groupProductsByCategory(products);
-  }, [products]);
+    return searchProducts(products, searchQuery, 30);
+  }, [products, searchQuery]);
   
-  // Get editions for the selected category
-  const availableEditions = useMemo(() => {
-    if (!selectedCategory) return [];
-    const group = categoryGroups.find(g => g.category === selectedCategory);
-    return group?.editions ?? [];
-  }, [categoryGroups, selectedCategory]);
-  
-  // Determine if the current value matches a known product
-  const isKnownProduct = useMemo(() => {
-    if (!products || !value) return false;
-    const { category, edition } = parseDiscountMatrixName(value);
-    return products.some(p => 
-      p.category === category && 
-      (edition === null ? p.edition === null : p.edition === edition)
-    );
-  }, [products, value]);
-  
-  // Sync local state when value prop changes
-  useEffect(() => {
-    const { category, edition } = parseDiscountMatrixName(value);
-    
-    if (isKnownProduct) {
-      setSelectedCategory(category);
-      setSelectedEdition(edition);
-      setIsCustomMode(false);
-    } else if (value && !isKnownProduct) {
-      // Value exists but doesn't match price book - it's a custom product
-      setCustomName(value);
-      setIsCustomMode(true);
-    }
-  }, [value, isKnownProduct]);
-  
-  // Handle category selection
-  const handleCategoryChange = (category: string) => {
-    setSelectedCategory(category);
-    setSelectedEdition(null); // Reset edition when category changes
-    
-    // Find the group to check if it has editions
-    const group = categoryGroups.find(g => g.category === category);
-    
-    if (group) {
-      // If only one edition (or null edition only), auto-select it
-      if (group.editions.length === 1) {
-        const edition = group.editions[0].edition;
-        setSelectedEdition(edition);
-        
-        // Build product name and trigger callbacks
-        const productName = buildDiscountMatrixName(category, edition);
-        onChange(productName);
-        
-        // Get price and trigger callback
-        if (products) {
-          const price = getPriceForSelection(products, category, edition);
-          if (price !== null) {
-            onPriceSelect(price);
-          }
-        }
-      }
-    }
-  };
-  
-  // Handle edition selection
-  const handleEditionChange = (edition: string) => {
-    // Handle "none" as null
-    const editionValue = edition === '__none__' ? null : edition;
-    setSelectedEdition(editionValue);
-    
-    // Build product name and trigger callbacks
-    const productName = buildDiscountMatrixName(selectedCategory, editionValue);
-    onChange(productName);
-    
-    // Get price and trigger callback
-    if (products) {
-      const price = getPriceForSelection(products, selectedCategory, editionValue);
-      if (price !== null) {
-        onPriceSelect(price);
-      }
-    }
-  };
+  // Handle product selection
+  const handleSelect = useCallback((result: SearchResult) => {
+    // Build the discount matrix name for database storage
+    const discountMatrixName = getDiscountMatrixName(result.category, result.edition);
+    onChange(discountMatrixName);
+    onPriceSelect(result.monthlyPrice);
+    setIsOpen(false);
+    setSearchQuery('');
+  }, [onChange, onPriceSelect]);
   
   // Handle custom product name
   const handleCustomNameChange = (name: string) => {
@@ -139,21 +79,32 @@ export function HierarchicalProductPicker({
   const handleSwitchToCustom = () => {
     setIsCustomMode(true);
     setCustomName(value);
+    setIsOpen(false);
   };
   
   // Toggle back to picker mode
   const handleSwitchToPicker = () => {
     setIsCustomMode(false);
-    setSelectedCategory('');
-    setSelectedEdition(null);
+    setSearchQuery('');
   };
+  
+  // Clear selection
+  const handleClear = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange('');
+    setSearchQuery('');
+  }, [onChange]);
+  
+  // Focus input when popover opens
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [isOpen]);
   
   if (isLoading) {
     return (
-      <div className="flex gap-2">
-        <div className="h-10 flex-1 bg-muted animate-pulse rounded-md" />
-        <div className="h-10 flex-1 bg-muted animate-pulse rounded-md" />
-      </div>
+      <div className="h-10 bg-muted animate-pulse rounded-md" />
     );
   }
   
@@ -183,56 +134,106 @@ export function HierarchicalProductPicker({
   
   return (
     <div className="flex gap-2 items-end">
-      {/* Category Select */}
-      <div className="flex-1 min-w-0">
-        <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-          <SelectTrigger className="h-10">
-            <SelectValue placeholder="Select product..." />
-          </SelectTrigger>
-          <SelectContent className="max-h-[300px]">
-            {categoryGroups.map((group) => (
-              <SelectItem key={group.category} value={group.category}>
-                {group.category}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      
-      {/* Edition Select - only show if category has multiple editions */}
-      {selectedCategory && availableEditions.length > 1 && (
-        <div className="flex-1 min-w-0">
-          <Select 
-            value={selectedEdition ?? '__none__'} 
-            onValueChange={handleEditionChange}
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={isOpen}
+            className={cn(
+              "h-10 justify-between flex-1 min-w-0 font-normal",
+              !value && "text-muted-foreground"
+            )}
           >
-            <SelectTrigger className="h-10">
-              <SelectValue placeholder="Select edition..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availableEditions.map((ed) => (
-                <SelectItem 
-                  key={ed.edition ?? '__none__'} 
-                  value={ed.edition ?? '__none__'}
-                >
-                  {ed.edition ?? 'Standard'}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-      
-      {/* Custom product button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={handleSwitchToCustom}
-        className="h-10 w-10 shrink-0 text-muted-foreground"
-        title="Enter custom product name"
-      >
-        <Pencil className="h-4 w-4" />
-      </Button>
+            <span className="truncate">
+              {displayValue || "Search products..."}
+            </span>
+            <div className="flex items-center gap-1 shrink-0 ml-2">
+              {value && (
+                <X 
+                  className="h-4 w-4 opacity-50 hover:opacity-100" 
+                  onClick={handleClear}
+                />
+              )}
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </div>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent 
+          className="w-[400px] p-0" 
+          align="start"
+          sideOffset={4}
+        >
+          {/* Search input */}
+          <div className="flex items-center border-b px-3">
+            <Search className="h-4 w-4 shrink-0 opacity-50" />
+            <Input
+              ref={inputRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Type to search products..."
+              className="h-11 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+            />
+          </div>
+          
+          {/* Results */}
+          <ScrollArea className="h-[300px]">
+            {searchResults.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                No products found.
+              </div>
+            ) : (
+              <div className="p-1">
+                {searchResults.map((result) => {
+                  const isSelected = value === getDiscountMatrixName(result.category, result.edition);
+                  return (
+                    <button
+                      key={`${result.category}-${result.edition ?? 'null'}`}
+                      onClick={() => handleSelect(result)}
+                      className={cn(
+                        "flex items-center justify-between w-full px-3 py-2.5 text-sm rounded-md",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        "focus:bg-accent focus:text-accent-foreground focus:outline-none",
+                        isSelected && "bg-accent"
+                      )}
+                    >
+                      <div className="flex flex-col items-start gap-0.5 min-w-0">
+                        <span className="font-medium truncate w-full text-left">
+                          {result.category}
+                        </span>
+                        {result.edition && (
+                          <span className="text-xs text-muted-foreground">
+                            {result.edition} Edition
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          ${result.monthlyPrice.toLocaleString()}/mo
+                        </span>
+                        {isSelected && (
+                          <Check className="h-4 w-4" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+          
+          {/* Custom product option */}
+          <div className="border-t p-2">
+            <button
+              onClick={handleSwitchToCustom}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md"
+            >
+              <Pencil className="h-4 w-4" />
+              Enter custom product name
+            </button>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
