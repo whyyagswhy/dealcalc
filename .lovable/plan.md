@@ -1,161 +1,171 @@
 
-# Plan: Improve KPI Banner UI and Conditional Display Logic
+# Plan: Auto-Match Imported Contract Products to Price Book
 
 ## Summary
-Refactor the ScenarioSummary KPI banner to fix visual issues, conditionally show Incremental ACV only when existing volume data exists, rename "Comm. ACV" to "Incremental ACV", and add annual/term costs plus savings to the customer-facing view.
+When a user imports a contract via the AI extraction feature, enhance the flow to:
+1. **Automatically match** each extracted product name to the price book using fuzzy search
+2. **Update the list price** from the price book for matched products
+3. **Format the product name** in discount matrix format (`[Edition] Category`) for proper discount lookups
+4. **Create a "Current Contract" scenario** with all matched line items
 
 ---
 
-## Changes Overview
+## Current Flow
 
-### 1. Fix Visual Issues in KPI Banner
-**Problem**: Values are truncated/overlapping when numbers get large (e.g., "$262,500" barely fits)
-
-**Solution**:
-- Reduce font sizes slightly for better fit
-- Add responsive text sizing that scales down on narrower cards
-- Improve spacing and ensure `whitespace-nowrap` prevents mid-word breaks
-- Use 3-column grid for primary row on small screens to prevent crowding
-
-### 2. Rename "Comm. ACV" → "Incremental ACV"
-**Location**: `ScenarioSummary.tsx` line 77
-
-**Change**:
-```text
-Before: "Comm. ACV"
-After:  "Incr. ACV"
+```
+Contract Image → AI Extraction → Editable Table → Manual Review → Create Scenario
+                                     ↓
+                          Raw product names like:
+                          "Sales Cloud Enterprise"
+                          "Service Cloud - Unlimited Edition"
 ```
 
-### 3. Conditionally Show Incremental ACV
-**Logic**: Only display the Incremental ACV row if any line item has existing volume data entered (`totalExistingAnnual > 0`)
-
-**Current behavior**: Always shows both "Comm. ACV" and "Total ACV" in internal view
-**New behavior**: 
-- If no existing volume data: Show only "Total ACV" (since Incremental = Total in this case)
-- If existing volume data exists: Show both "Incr. ACV" and "Total ACV"
-
-### 4. Customer View: Add Annual, Term, and Savings KPIs
-**Current customer view shows**: List/mo, Net/mo, Discount, Term Total (4 items)
-
-**New customer view will show** (2 rows):
-- **Row 1**: Annual Cost, Term Cost, Discount
-- **Row 2**: Annual Savings, Term Savings
-
-This gives customers clear visibility into their actual costs and savings without internal metrics.
+**Problem**: Extracted product names don't match the discount matrix format, and list prices aren't auto-populated from the price book.
 
 ---
 
-## Technical Implementation
+## New Flow
 
-### File: `src/components/scenarios/ScenarioSummary.tsx`
+```
+Contract Image → AI Extraction → AI Product Matching → Editable Table → Create Scenario
+                                     ↓                       ↓
+                          Matched to price book:      Shows matched price,
+                          "[Enterprise] Sales Cloud"   allows manual override
+```
 
-#### Props Enhancement
-Add `enableExistingVolume` prop to know whether to check for baseline data:
+---
+
+## Implementation Steps
+
+### Step 1: Create Product Matching Edge Function
+**New file: `supabase/functions/match-products/index.ts`**
+
+This function will:
+1. Accept an array of raw product names from the extraction
+2. Query the price book products from the database
+3. Use AI (Gemini 2.5 Flash) to intelligently match each extracted product to a price book entry
+4. Return matched products with their correct names and prices
+
+**Why AI matching?**
+- Extracted product names are messy: "Sales Cloud Enterprise Edition", "SF Sales - Enterprise", "Salesforce Sales Cloud (Enterprise)"
+- All should map to `Sales Cloud` category + `Enterprise` edition
+- AI can understand semantic equivalence better than fuzzy string matching alone
+
+### Step 2: Update Extract Contract Function  
+**Modify: `supabase/functions/extract-contract/index.ts`**
+
+Add product matching as a second step after extraction:
+1. Extract raw line items from the image (existing)
+2. Fetch price book products from database
+3. Call AI to match each product name to price book entries
+4. Return enriched line items with:
+   - `matched_product_name`: The discount matrix format name
+   - `matched_list_price`: Price from price book (or original if no match)
+   - `match_confidence`: high/medium/low
+   - `original_product_name`: What was extracted from the image
+
+### Step 3: Update Import Dialog UI
+**Modify: `src/components/deals/ImportContractDialog.tsx`**
+
+Enhance the editable table to show:
+- Match status indicator (checkmark for matched, warning for unmatched)
+- Display matched product name with ability to override
+- Show list price from price book (auto-filled)
+- Keep original extracted name visible for reference
+
+### Step 4: Update Line Item Creation
+**Modify: `src/pages/DealDetail.tsx` - `handleImportContract`**
+
+Use the matched product names when creating line items so they work correctly with:
+- Discount matrix lookups (Max L4 button)
+- Approval level calculations
+
+---
+
+## Technical Details
+
+### Edge Function: Extract Contract (Updated)
 
 ```typescript
-interface ScenarioSummaryProps {
-  lineItems: LineItem[];
-  displayMode: DisplayMode;
-  viewMode: ViewMode;
-  className?: string;
+// After extracting raw line items...
+const matchedItems = await matchProductsToBook(extractedData.line_items, priceBookProducts);
+
+return {
+  success: true,
+  data: {
+    line_items: matchedItems,  // Now includes matched_product_name, matched_list_price
+    confidence: extractedData.confidence,
+    notes: extractedData.notes,
+  }
+};
+```
+
+### AI Product Matching Prompt
+
+```
+You are matching product names from a contract to a Salesforce price book.
+
+Price Book Products:
+[List of category + edition combinations]
+
+Extracted Products to Match:
+1. "Sales Cloud Enterprise Edition" 
+2. "SF Service - Unlimited"
+...
+
+For each extracted product, find the best match from the price book.
+Return the matched category and edition, or null if no good match exists.
+```
+
+### Enhanced Line Item Interface
+
+```typescript
+interface ExtractedLineItem {
+  // Original extracted values
+  product_name: string;
+  list_unit_price: number;
+  quantity: number;
+  term_months: number;
+  discount_percent: number | null;
+  net_unit_price: number | null;
+  
+  // New: matching results
+  matched_product_name: string | null;  // "[Enterprise] Sales Cloud"
+  matched_list_price: number | null;    // From price book
+  match_confidence: 'high' | 'medium' | 'low' | 'none';
 }
 ```
 
-#### Internal View Logic
-```typescript
-// Only show Incremental ACV if there's actual existing volume data
-const hasExistingVolumeData = totals.totalExistingAnnual > 0;
+### UI Display in Import Dialog
 
-{isInternal && hasExistingVolumeData && (
-  <div className="grid grid-cols-2 gap-4">
-    <KpiBlock label="Incr. ACV" value={formatCurrency(totals.totalCommissionableACV)} />
-    <KpiBlock label="Total ACV" value={formatCurrency(totals.totalACV)} />
-  </div>
-)}
-
-{isInternal && !hasExistingVolumeData && (
-  <div className="flex justify-center">
-    <KpiBlock label="Total ACV" value={formatCurrency(totals.totalACV)} />
-  </div>
-)}
-```
-
-#### Customer View Layout
-```typescript
-{!isInternal && (
-  <>
-    {/* Row 1: Costs */}
-    <div className="grid grid-cols-3 gap-4">
-      <KpiBlock label="Annual" value={formatCurrency(totals.netAnnual)} />
-      <KpiBlock label="Term Cost" value={formatCurrency(totals.netTerm)} />
-      <KpiBlock label="Discount" value={formatPercent(totals.blendedDiscount)} />
-    </div>
-    
-    {/* Row 2: Savings */}
-    <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-white/20">
-      <KpiBlock label="Annual Savings" value={formatCurrency(annualSavings)} />
-      <KpiBlock label="Term Savings" value={formatCurrency(totals.totalSavings)} />
-    </div>
-  </>
-)}
-```
-
-#### Calculations to Add
-```typescript
-// Calculate annual savings (list - net annual)
-const annualSavings = totals.listAnnual - totals.netAnnual;
-```
-
-#### Visual Improvements to KpiBlock
-```typescript
-function KpiBlock({ label, value, size = 'normal' }: { 
-  label: string; 
-  value: string; 
-  size?: 'normal' | 'compact';
-}) {
-  return (
-    <div className="flex flex-col items-center text-center">
-      <span className={cn(
-        "font-semibold text-white/80 uppercase tracking-wider whitespace-nowrap",
-        size === 'compact' ? "text-[9px]" : "text-[10px] sm:text-xs"
-      )}>
-        {label}
-      </span>
-      <span className={cn(
-        "font-bold text-white tabular-nums whitespace-nowrap",
-        size === 'compact' ? "text-base sm:text-lg" : "text-lg sm:text-xl"
-      )}>
-        {value}
-      </span>
-    </div>
-  );
-}
-```
+| Original | Matched Product | List Price | Qty | Net Price |
+|----------|-----------------|------------|-----|-----------|
+| "Sales Cloud Enterprise" | ✓ Sales Cloud - Enterprise | $175/mo | 50 | $140/mo |
+| "Custom App" | ⚠ No match (keep as-is) | $50/mo | 10 | $50/mo |
 
 ---
 
-## KPI Display Summary
+## Files to Create
 
-| View | Row 1 | Row 2 |
-|------|-------|-------|
-| **Internal (no existing volume)** | List, Net, Discount, Term Total | Total ACV (centered) |
-| **Internal (with existing volume)** | List, Net, Discount, Term Total | Incr. ACV, Total ACV |
-| **Customer** | Annual, Term Cost, Discount | Annual Savings, Term Savings |
-
----
+| File | Purpose |
+|------|---------|
+| (None - consolidating into extract-contract function) | |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/scenarios/ScenarioSummary.tsx` | Main refactor: conditional Incremental ACV, customer view savings, visual fixes |
+| `supabase/functions/extract-contract/index.ts` | Add product matching step after extraction |
+| `src/components/deals/ImportContractDialog.tsx` | Show match status, use matched values |
+| `src/pages/DealDetail.tsx` | Use matched product names when creating line items |
 
 ---
 
 ## Testing Criteria
 
-1. **Internal view without existing volume**: Shows List/mo, Net/mo, Discount, Term Total on row 1, centered "Total ACV" on row 2
-2. **Internal view with existing volume entered on an Add-on line**: Shows both "Incr. ACV" and "Total ACV" on row 2
-3. **Customer view**: Shows Annual, Term Cost, Discount on row 1; Annual Savings, Term Savings on row 2
-4. **Large values don't truncate**: $262,500 and similar values display fully without ellipsis
-5. **Responsive**: Layout adjusts cleanly on mobile without overlapping
+1. **Upload a contract image** - Products should be extracted and matched to price book
+2. **Matched products show checkmark** - With correct category/edition and price from price book
+3. **Unmatched products show warning** - User can manually edit
+4. **Created scenario uses matched names** - Format like `[Enterprise] Sales Cloud`
+5. **Max L4 button works** - Discount matrix lookup succeeds with matched names
+6. **List prices auto-fill** - From price book for matched products
