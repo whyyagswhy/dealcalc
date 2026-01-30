@@ -1,68 +1,114 @@
 
+# Plan: Intuitive Hierarchical Product Picker with Price Auto-Fill
 
-# Make Settings Toggles More Accessible
+## Summary
+Replace the current flat product combobox with a two-step hierarchical picker: first select a **Category** (e.g., "Sales Cloud"), then select an **Edition** (e.g., "Enterprise" or "Unlimited"). This matches how Salesforce products are actually structured and automatically populates the list price from the price book.
 
-## Current State
-The deal settings (Display Mode, View Mode, Existing Volume toggle) are hidden inside a popover that requires clicking a "Settings" button. This creates unnecessary friction since these are frequently-used controls.
+## Problems Identified
 
-## Proposed Solution
-Surface the most commonly used toggles directly in the header toolbar, keeping the layout clean while making controls immediately accessible.
+1. **Naming Mismatch**: The discount matrix has products like `[Unlimited] Sales Cloud` while the price book has `Sales Cloud - Unlimited Edition`. The lookup fails because these names don't match.
+
+2. **Flat List UX**: The current dropdown shows ~1,900 products in a single flat list, making it hard to find what you need.
+
+3. **No Price Auto-Fill**: Due to the naming mismatch, the price lookup returns `undefined` and list price doesn't populate.
+
+## Solution Architecture
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│  ← Back   │  Deal Name ○                        │ [Monthly|Annual] [Internal|Customer] │
-└─────────────────────────────────────────────────────────────────────────────────────┘
++--------------------+     +--------------------+
+|  Category Select   | --> |   Edition Select   | --> Auto-fill List Price
+|  "Sales Cloud"     |     |  "Enterprise"      |     + Set product_name
++--------------------+     +--------------------+
+         |                          |
+         v                          v
+  price_book_products        Constructs final name:
+  (distinct categories)      "[Enterprise] Sales Cloud"
+                             for discount matrix lookup
 ```
 
-### Desktop Layout
-- **Display Mode Toggle** (Monthly/Annual) - pill-style toggle visible in header
-- **View Mode Toggle** (Internal/Customer) - pill-style toggle visible in header  
-- **Existing Volume** switch - moved to a subtle overflow menu (⋮) since it's less frequently used
+## Implementation Steps
 
-### Mobile Layout  
-- On screens < 768px, collapse toggles into a slim toolbar row below the header
-- Use compact icons with labels to save horizontal space
+### Step 1: Create New Hierarchical Product Picker Component
+Create `src/components/scenarios/HierarchicalProductPicker.tsx`:
+
+- **Category dropdown**: Lists distinct categories from `price_book_products` (Sales Cloud, Service Cloud, etc.)
+- **Edition dropdown**: Shows available editions for the selected category (Enterprise, Unlimited, Professional, etc.)
+- When both are selected:
+  - Look up price from `price_book_products` using category + edition
+  - Construct the discount matrix product name: `[{edition}] {category}` (e.g., `[Enterprise] Sales Cloud`)
+  - Return both values to parent: product name for discount lookup, price for auto-fill
+
+### Step 2: Create Product Mapping Utilities
+Add `src/lib/productMapping.ts`:
+
+- `buildDiscountMatrixName(category, edition)`: Constructs `[Enterprise] Sales Cloud` format
+- `parseDiscountMatrixName(productName)`: Extracts category and edition from `[Enterprise] Sales Cloud`
+- `findPriceBookMatch(priceBook, category, edition)`: Finds matching price book entry
+
+### Step 3: Update Price Book Hook
+Modify `src/hooks/usePriceBook.ts`:
+
+- Add new query for distinct categories with their editions
+- Create lookup by category + edition instead of just product name
+
+### Step 4: Update LineItemRow Integration
+Modify `src/components/scenarios/LineItemRow.tsx`:
+
+- Replace `ProductCombobox` with new `HierarchicalProductPicker`
+- Handle both outputs: `product_name` for saving + discount matrix, `listPrice` for auto-fill
+- Support editing existing line items by parsing the stored product name
+
+### Step 5: Keep Existing Combobox as Fallback
+- Keep "Custom product" option for products not in the standard list
+- Add a "More products..." option that opens the full searchable list
+
+## UI Design
+
+```text
+Row 1 (new layout):
++------------------+  +------------------+  +-----------+
+|  Category   ▾    |  |  Edition    ▾    |  | [Mo/An]   |
+|  Sales Cloud     |  |  Enterprise      |  |  toggle   |
++------------------+  +------------------+  +-----------+
+
+Row 2 (unchanged):
++-------------+  +-------+  +-----------+
+| List Price  |  |  Qty  |  | Term (mo) |
+|  $175.00    |  |  25   |  |    12     |
++-------------+  +-------+  +-----------+
+```
+
+## Data Flow
+
+1. User selects **Category**: "Sales Cloud"
+2. User selects **Edition**: "Enterprise"
+3. System looks up `price_book_products` where category="Sales Cloud" AND edition="Enterprise"
+4. System auto-fills List Price: `$175/mo`
+5. System sets `product_name` to `[Enterprise] Sales Cloud` for discount matrix compatibility
+
+## Edge Cases
+
+- **Products without editions**: Some add-ons have no edition (e.g., "Pardot"). Show edition dropdown as "N/A" or hide it.
+- **Custom products**: Keep the "Custom product" option for items not in the price book.
+- **Existing line items**: Parse stored `product_name` to pre-select category and edition.
 
 ---
 
-## Implementation Details
+## Technical Details
 
-### 1. Create ViewModeToggle Component
-New pill-style toggle matching existing `DisplayModeToggle` pattern:
-- "Internal" and "Customer" options
-- Same styling with rounded-full container and active state highlighting
+### Files to Create
+- `src/components/scenarios/HierarchicalProductPicker.tsx` - New two-step picker component
+- `src/lib/productMapping.ts` - Name parsing and construction utilities
 
-### 2. Create DealToolbar Component
-New component that houses the inline toggles:
-- DisplayModeToggle (already exists)
-- ViewModeToggle (new)
-- Optional overflow menu for Existing Volume toggle
+### Files to Modify
+- `src/hooks/usePriceBook.ts` - Add category/edition grouping query
+- `src/components/scenarios/LineItemRow.tsx` - Integrate new picker
 
-### 3. Update DealDetail Page
-- Replace `DealSettings` popover with inline `DealToolbar`
-- Handle responsive layout with Tailwind breakpoints
-- Keep ImportContractDialog button in same position
+### Database
+No database changes needed. Both tables already have the required data structure.
 
-### 4. Responsive Behavior
-- Desktop: toggles inline in header row
-- Mobile: toggles stack in a secondary row below deal name
-
----
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/deals/ViewModeToggle.tsx` | Create new pill-style toggle for Internal/Customer |
-| `src/components/deals/DealToolbar.tsx` | Create toolbar with toggles and overflow menu |
-| `src/pages/DealDetail.tsx` | Replace DealSettings with DealToolbar |
-| `src/components/deals/DealSettings.tsx` | Delete or refactor to overflow-only |
-
----
-
-## Visual Design
-Following existing patterns from project knowledge:
-- **Pill-style toggles**: rounded-full container, solid primary for active segment
-- **Touch targets**: 44px minimum height
-- **Colors**: Deep indigo for active states, muted for inactive
-
+### Testing Criteria
+1. Select "Sales Cloud" > "Enterprise" - List price should auto-fill to $175
+2. Discount badge should show approval levels correctly (product name matches discount matrix)
+3. Max L4 button should apply the correct maximum discount
+4. Existing line items with `[Enterprise] Sales Cloud` should show correct category/edition selected
