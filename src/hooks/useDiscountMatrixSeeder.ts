@@ -20,14 +20,18 @@ export function useDiscountMatrixSeeder() {
 
         if (countError) {
           // Table might not exist yet or other error
-          console.log('Discount thresholds table check failed:', countError.message);
+          if (import.meta.env.DEV) {
+            console.log('Discount thresholds table check failed:', countError.message);
+          }
           setStatus('error');
           setMessage(`Table check failed: ${countError.message}`);
           return;
         }
 
         if (count && count > 0) {
-          console.log(`Discount thresholds already seeded with ${count} rows`);
+          if (import.meta.env.DEV) {
+            console.log(`Discount thresholds already seeded with ${count} rows`);
+          }
           setStatus('done');
           setMessage(`Already seeded with ${count} rows`);
           return;
@@ -35,24 +39,32 @@ export function useDiscountMatrixSeeder() {
 
         // Need to seed the data
         setStatus('seeding');
-        console.log('Seeding discount thresholds...');
+        if (import.meta.env.DEV) {
+          console.log('Seeding discount thresholds...');
+        }
         
         const result = await seedDiscountMatrix();
         
         if (result.success) {
           setStatus('done');
           setMessage(result.message);
-          console.log('Discount matrix seeding complete:', result.message);
+          if (import.meta.env.DEV) {
+            console.log('Discount matrix seeding complete:', result.message);
+          }
         } else {
           setStatus('error');
           setMessage(result.message);
-          console.error('Discount matrix seeding failed:', result.message);
+          if (import.meta.env.DEV) {
+            console.error('Discount matrix seeding failed:', result.message);
+          }
         }
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         setStatus('error');
         setMessage(errorMsg);
-        console.error('Error in discount matrix seeder:', error);
+        if (import.meta.env.DEV) {
+          console.error('Error in discount matrix seeder:', error);
+        }
       }
     }
 
