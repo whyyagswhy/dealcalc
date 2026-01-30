@@ -16,6 +16,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useDiscountMatrixProducts, groupDiscountProductsByCategory, type DiscountMatrixProduct } from '@/hooks/useDiscountThresholds';
+import { usePriceBook, createPriceLookup } from '@/hooks/usePriceBook';
 
 interface ProductComboboxProps {
   value: string;
@@ -38,7 +39,14 @@ export function ProductCombobox({
   const [searchQuery, setSearchQuery] = useState('');
   const buttonRef = useRef<HTMLButtonElement>(null);
   
-  const { data: products, isLoading, error } = useDiscountMatrixProducts();
+  const { data: products, isLoading: productsLoading, error: productsError } = useDiscountMatrixProducts();
+  const { data: priceBook } = usePriceBook();
+  
+  // Create price lookup map from price book
+  const priceLookup = useMemo(() => {
+    if (!priceBook) return new Map<string, number>();
+    return createPriceLookup(priceBook);
+  }, [priceBook]);
 
   // Filter products based on search query
   const filteredProducts = useMemo(() => {
@@ -69,10 +77,16 @@ export function ProductCombobox({
   // Handle product selection
   const handleSelect = useCallback((product: DiscountMatrixProduct) => {
     onChange(product.product_name);
-    // Note: discount matrix doesn't include prices, so we don't call onPriceSelect
+    
+    // Look up the monthly price from price book and auto-fill if available
+    const monthlyPrice = priceLookup.get(product.product_name);
+    if (monthlyPrice !== undefined && onPriceSelect) {
+      onPriceSelect(monthlyPrice);
+    }
+    
     setOpen(false);
     setSearchQuery('');
-  }, [onChange]);
+  }, [onChange, onPriceSelect, priceLookup]);
 
   // Handle custom product entry
   const handleCustomSelect = useCallback(() => {
@@ -121,28 +135,28 @@ export function ProductCombobox({
             onValueChange={setSearchQuery}
           />
           <CommandList className="max-h-[300px]">
-            {isLoading && (
+            {productsLoading && (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             )}
             
-            {error && (
+            {productsError && (
               <div className="py-6 text-center text-sm text-destructive">
                 Failed to load products
               </div>
             )}
 
-            {!isLoading && !error && filteredProducts.length === 0 && !searchQuery.trim() && (
+            {!productsLoading && !productsError && filteredProducts.length === 0 && !searchQuery.trim() && (
               <CommandEmpty>No products available</CommandEmpty>
             )}
 
-            {!isLoading && !error && filteredProducts.length === 0 && searchQuery.trim() && (
+            {!productsLoading && !productsError && filteredProducts.length === 0 && searchQuery.trim() && (
               <CommandEmpty>No products found</CommandEmpty>
             )}
 
             {/* Custom product option when no exact match */}
-            {!isLoading && searchQuery.trim() && !hasExactMatch && (
+            {!productsLoading && searchQuery.trim() && !hasExactMatch && (
               <CommandGroup>
                 <CommandItem
                   value={`custom-${searchQuery}`}
