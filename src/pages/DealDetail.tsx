@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { SaveStatusIndicator } from '@/components/deals/SaveStatusIndicator';
 import { DealToolbar } from '@/components/deals/DealToolbar';
 import { ImportContractDialog } from '@/components/deals/ImportContractDialog';
+import { DealSummaryGenerator } from '@/components/deals/DealSummaryGenerator';
 import { ScenarioCard } from '@/components/scenarios/ScenarioCard';
 import { ScenarioComparison } from '@/components/scenarios/ScenarioComparison';
 import { AccessDenied } from '@/components/AccessDenied';
@@ -298,6 +299,13 @@ export default function DealDetail() {
           </div>
         )}
       </main>
+
+      {/* AI Summary Generator */}
+      <DealSummaryGenerator 
+        dealId={dealId!} 
+        dealName={dealName} 
+        hasScenarios={hasScenarios} 
+      />
 
       {/* Delete Scenario Confirmation */}
       <AlertDialog open={!!deleteScenarioId} onOpenChange={() => setDeleteScenarioId(null)}>
