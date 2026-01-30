@@ -7,7 +7,7 @@ import { useAutosave } from '@/hooks/useAutosave';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SaveStatusIndicator } from '@/components/deals/SaveStatusIndicator';
-import { DealSettings } from '@/components/deals/DealSettings';
+import { DealToolbar } from '@/components/deals/DealToolbar';
 import { ImportContractDialog } from '@/components/deals/ImportContractDialog';
 import { ScenarioCard } from '@/components/scenarios/ScenarioCard';
 import { ScenarioComparison } from '@/components/scenarios/ScenarioComparison';
@@ -190,7 +190,7 @@ export default function DealDetail() {
               dealId={dealId!} 
               onImportComplete={handleImportContract} 
             />
-            <DealSettings 
+            <DealToolbar 
               deal={deal} 
               onUpdate={(updates: Partial<Deal>) => updateDeal.mutate({ id: dealId!, updates })} 
             />
