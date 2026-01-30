@@ -129,18 +129,20 @@ export function ScenarioCard({
   return (
     <Card className="w-full flex-1 min-w-0">
       <CardHeader className="pb-4 sm:pb-5">
-        <div className="flex items-center justify-between gap-2">
-          {isInternal ? (
-            <Input
-              value={scenarioName}
-              onChange={(e) => setScenarioName(e.target.value)}
-              className="h-10 border-transparent bg-transparent text-lg sm:text-xl font-semibold hover:border-input focus:border-input"
-              placeholder="Scenario name"
-            />
-          ) : (
-            <h3 className="text-lg sm:text-xl font-semibold text-foreground">{scenarioName}</h3>
-          )}
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            {isInternal ? (
+              <Input
+                value={scenarioName}
+                onChange={(e) => setScenarioName(e.target.value)}
+                className="h-10 border-transparent bg-transparent text-lg sm:text-xl font-semibold hover:border-input focus:border-input"
+                placeholder="Scenario name"
+              />
+            ) : (
+              <h3 className="text-lg sm:text-xl font-semibold text-foreground truncate">{scenarioName}</h3>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             {isInternal && (
               <>
                 <DisplayModeToggle
@@ -171,7 +173,7 @@ export function ScenarioCard({
             )}
             {isCustomer && (
               <div className="flex items-center gap-2">
-                <Label htmlFor={`compare-${scenario.id}`} className="text-xs text-muted-foreground">
+                <Label htmlFor={`compare-${scenario.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
                   Compare
                 </Label>
                 <Switch
