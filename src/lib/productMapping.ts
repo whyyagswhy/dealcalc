@@ -389,24 +389,34 @@ function getPopularProducts(products: PriceBookProduct[]): SearchResult[] {
 /**
  * Mapping rules for price book -> discount matrix
  * These handle special cases where names don't match 1:1
+ * 
+ * NOTE: The discount matrix often has limited editions available for products.
+ * For example, Sales Cloud only has [Unlimited] and [Enterprise] (Emerging Market).
+ * The approval badge uses fuzzy matching to find the closest match.
  */
 interface MappingRule {
   priceBook: { category: string; edition?: string | null };
   discountMatrix: string;
 }
 
-// Known mappings for special cases
+// Known mappings for special cases where the discount matrix name differs significantly
+// Note: We use the actual names from the discount_thresholds table
 const SPECIAL_MAPPINGS: MappingRule[] = [
-  // Main clouds - standard format
-  { priceBook: { category: 'Sales Cloud', edition: 'Enterprise' }, discountMatrix: '[Enterprise] Sales Cloud' },
+  // Sales Cloud - only Unlimited edition in standard matrix
   { priceBook: { category: 'Sales Cloud', edition: 'Unlimited' }, discountMatrix: '[Unlimited] Sales Cloud' },
-  { priceBook: { category: 'Sales Cloud', edition: 'Professional' }, discountMatrix: '[Professional] Sales Cloud' },
-  { priceBook: { category: 'Service Cloud', edition: 'Enterprise' }, discountMatrix: '[Enterprise] Service Cloud' },
+  // Enterprise Sales Cloud maps to Unlimited (closest match in matrix)
+  { priceBook: { category: 'Sales Cloud', edition: 'Enterprise' }, discountMatrix: '[Unlimited] Sales Cloud' },
+  { priceBook: { category: 'Sales Cloud', edition: 'Professional' }, discountMatrix: '[Unlimited] Sales Cloud' },
+  // Service Cloud - similar pattern
   { priceBook: { category: 'Service Cloud', edition: 'Unlimited' }, discountMatrix: '[Unlimited] Service Cloud' },
-  { priceBook: { category: 'Service Cloud', edition: 'Professional' }, discountMatrix: '[Professional] Service Cloud' },
+  { priceBook: { category: 'Service Cloud', edition: 'Enterprise' }, discountMatrix: '[Unlimited] Service Cloud' },
+  { priceBook: { category: 'Service Cloud', edition: 'Professional' }, discountMatrix: '[Unlimited] Service Cloud' },
   // Einstein products
   { priceBook: { category: 'Einstein', edition: 'Sales' }, discountMatrix: '[Enterprise, Unlimited] Einstein Conversation Insights' },
   { priceBook: { category: 'Einstein', edition: 'Service' }, discountMatrix: '[Enterprise, Unlimited] Einstein Bots' },
+  // CRM Analytics
+  { priceBook: { category: 'CRM Analytics', edition: 'Growth' }, discountMatrix: '[Enterprise, Unlimited] CRM Analytics Growth' },
+  { priceBook: { category: 'CRM Analytics', edition: 'Plus' }, discountMatrix: '[Enterprise, Unlimited] CRM Analytics Plus' },
 ];
 
 /**
