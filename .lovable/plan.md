@@ -1,313 +1,304 @@
 
-# Implementation Plan: Deal Deletion and Admin Dashboard
+# Deal Summary Generator - Implementation Plan
 
 ## Overview
-This plan adds two major features:
-1. **Deal deletion** on the main Deals page with confirmation dialog
-2. **Admin dashboard** accessible only to yagnavudathu@gmail.com with comprehensive user analytics, metrics, and deal visibility
+Add a one-click AI-powered summary generator to the Deal Detail page that creates customer-ready talking points and value propositions. The feature includes a floating action button with an optional prompt field for customization, generating clear, human-formatted summaries that highlight savings, value, and key deal points.
 
 ---
 
-## Part 1: Deal Deletion Feature
+## User Experience Flow
 
-### Changes to DealCard Component
-Add a delete button with dropdown menu to each deal card that:
-- Shows a trash icon on hover or via a "more options" menu
-- Prevents accidental clicks by stopping event propagation
-- Triggers a confirmation dialog before deletion
-
-### New Delete Confirmation Dialog
-- Reusable confirmation dialog component
-- Shows deal name being deleted
-- Requires explicit confirmation
-- Shows loading state during deletion
-
-### Delete Hook
-Create `useDeleteDeal` mutation hook in `useDeals.ts` that:
-- Calls Supabase to delete the deal
-- Cascading deletion is handled by database (scenarios and line_items)
-- Invalidates the deals cache on success
-- Shows success/error toast notifications
-
-### UI Flow
 ```text
-+------------------+     +------------------+     +-----------------+
-| DealCard         | --> | Confirm Dialog   | --> | Delete & Toast  |
-| [Trash Icon]     |     | "Delete Deal?"   |     | Refresh List    |
-+------------------+     +------------------+     +-----------------+
++------------------------------------------+
+|  Deal Header (Acme Corp Deal)            |
+|  [Monthly/Annual] [Internal/Customer] ⋮  |
++------------------------------------------+
+|                                          |
+|  Scenarios...                            |
+|                                          |
++------------------------------------------+
+                     |
+                     v
+    +------------------------------------+
+    |  [✨ Generate Summary]  floating   |
+    +------------------------------------+
+                     |
+        Click opens bottom sheet/dialog
+                     v
+    +------------------------------------+
+    | Generate Deal Summary              |
+    |------------------------------------|
+    | Optional: Add context for AI       |
+    | [Focus on multi-year savings...  ] |
+    |                                    |
+    | [✨ Generate]                      |
+    +------------------------------------+
+                     |
+                     v
+    +------------------------------------+
+    | Deal Summary                       |
+    |------------------------------------|
+    | ## Acme Corp Deal                  |
+    |                                    |
+    | ### Investment Overview            |
+    | Your annual investment: $48,000    |
+    | Term total: $144,000 (3 years)     |
+    |                                    |
+    | ### Your Savings                   |
+    | - 22% discount off list price      |
+    | - Annual savings: $13,500          |
+    | - Total savings over 3 years:      |
+    |   $40,500                          |
+    |                                    |
+    | ### What's Included               |
+    | - 50 seats of Sales Cloud         |
+    | - 50 seats of Service Cloud       |
+    | - Einstein Analytics              |
+    |                                    |
+    | ### Salesforce’s Incentives and Concessions |
+    | [AI-generated value proposition]   |
+    |------------------------------------|
+    | [📋 Copy] [⟳ Regenerate] [✕ Close] |
+    +------------------------------------+
 ```
 
 ---
 
-## Part 2: Admin Dashboard
+## Technical Architecture
 
-### New Files to Create
+### New Files
 
-1. **`src/pages/Admin.tsx`** - Main admin dashboard page
-2. **`src/pages/AdminUserDetail.tsx`** - Individual user detail view
-3. **`src/hooks/useAdminAccess.ts`** - Check if user is yagnavudathu@gmail.com
-4. **`src/hooks/useAdminUsers.ts`** - Fetch all users with metrics
-5. **`src/hooks/useAdminUserDeals.ts`** - Fetch specific user's deals
-6. **`src/components/admin/UserCard.tsx`** - User list item component
-7. **`src/components/admin/UserMetricsCard.tsx`** - Metrics display component
-8. **`src/components/admin/AdminHeader.tsx`** - Admin page header
+| File | Purpose |
+|------|---------|
+| `supabase/functions/generate-deal-summary/index.ts` | Edge function to generate summary via Lovable AI |
+| `src/components/deals/DealSummaryGenerator.tsx` | Main dialog component with prompt input and output display |
+| `src/hooks/useDealSummary.ts` | Hook to manage summary generation state and API calls |
 
-### Database Changes Required
+### Modified Files
 
-Create a new database function to allow admin to fetch all users and their metrics:
+| File | Change |
+|------|--------|
+| `src/pages/DealDetail.tsx` | Add floating summary button and import generator component |
+| `supabase/config.toml` | Register the new edge function |
 
-```sql
--- Function to check if user is the admin
-CREATE OR REPLACE FUNCTION public.is_admin_user(_user_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM auth.users
-    WHERE id = _user_id
-    AND email = 'yagnavudathu@gmail.com'
-  )
-$$;
+---
 
--- Create a view for admin to access user data (security definer function)
-CREATE OR REPLACE FUNCTION public.get_all_users_for_admin(_admin_user_id uuid)
-RETURNS TABLE (
-  id uuid,
-  email text,
-  created_at timestamptz,
-  last_sign_in_at timestamptz,
-  raw_user_meta_data jsonb,
-  raw_app_meta_data jsonb,
-  email_confirmed_at timestamptz,
-  deal_count bigint,
-  scenario_count bigint,
-  last_deal_activity timestamptz
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  -- Only allow the admin user to call this
-  IF NOT is_admin_user(_admin_user_id) THEN
-    RAISE EXCEPTION 'Access denied';
-  END IF;
-  
-  RETURN QUERY
-  SELECT 
-    u.id,
-    u.email::text,
-    u.created_at,
-    u.last_sign_in_at,
-    u.raw_user_meta_data,
-    u.raw_app_meta_data,
-    u.email_confirmed_at,
-    COALESCE(d.deal_count, 0)::bigint as deal_count,
-    COALESCE(d.scenario_count, 0)::bigint as scenario_count,
-    d.last_deal_activity
-  FROM auth.users u
-  LEFT JOIN (
-    SELECT 
-      user_id,
-      COUNT(*) as deal_count,
-      SUM(scenario_count) as scenario_count,
-      MAX(updated_at) as last_deal_activity
-    FROM deals
-    GROUP BY user_id
-  ) d ON u.id = d.user_id
-  ORDER BY u.created_at DESC;
-END;
-$$;
+## Component: DealSummaryGenerator
 
--- Function to get a specific user's deals for admin
-CREATE OR REPLACE FUNCTION public.get_user_deals_for_admin(
-  _admin_user_id uuid,
-  _target_user_id uuid
-)
-RETURNS TABLE (
-  id uuid,
-  name text,
-  created_at timestamptz,
-  updated_at timestamptz,
-  scenario_count integer,
-  display_mode text,
-  view_mode text
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  IF NOT is_admin_user(_admin_user_id) THEN
-    RAISE EXCEPTION 'Access denied';
-  END IF;
-  
-  RETURN QUERY
-  SELECT 
-    d.id,
-    d.name,
-    d.created_at,
-    d.updated_at,
-    d.scenario_count,
-    d.display_mode,
-    d.view_mode
-  FROM deals d
-  WHERE d.user_id = _target_user_id
-  ORDER BY d.updated_at DESC;
-END;
-$$;
-```
-
-### Admin Dashboard Layout
-
-```text
-+-----------------------------------------------------------+
-| Admin Dashboard                    yagnavudathu@gmail.com |
-+-----------------------------------------------------------+
-| Overview Stats                                             |
-| +------------+ +------------+ +------------+ +-----------+ |
-| | Total Users| | Active 24h | | Total Deals| | Scenarios | |
-| |     3      | |     1      | |     6      | |    12     | |
-| +------------+ +------------+ +------------+ +-----------+ |
-+-----------------------------------------------------------+
-| Users                                      [Search users] |
-+-----------------------------------------------------------+
-| +-------------------------------------------------------+ |
-| | yagnavudathu@gmail.com                                | |
-| | Joined: Jan 29 · Last login: 2h ago · 3 deals        | |
-| | Provider: Google                            [View >]  | |
-| +-------------------------------------------------------+ |
-| +-------------------------------------------------------+ |
-| | testuser@example.com                                  | |
-| | Joined: Jan 29 · Last login: 1d ago · 2 deals        | |
-| | Provider: Email                             [View >]  | |
-| +-------------------------------------------------------+ |
-+-----------------------------------------------------------+
-```
-
-### User Detail Page Layout
-
-```text
-+-----------------------------------------------------------+
-| < Back to Users          testuser@example.com             |
-+-----------------------------------------------------------+
-| User Information                                           |
-| +-------------------------------------------------------+ |
-| | Email           | testuser@example.com                | |
-| | User ID         | 80074ca4-4182-46c9-b12d-f1dedb40... | |
-| | Provider        | Email                               | |
-| | Joined          | January 29, 2026 at 5:10 AM         | |
-| | Email Verified  | January 29, 2026                    | |
-| | Last Sign In    | January 29, 2026 at 5:22 AM         | |
-| +-------------------------------------------------------+ |
-+-----------------------------------------------------------+
-| Usage Metrics                                              |
-| +------------+ +------------+ +------------+               |
-| | Deals      | | Scenarios  | | Last Active|               |
-| |     2      | |     5      | |   1d ago   |               |
-| +------------+ +------------+ +------------+               |
-+-----------------------------------------------------------+
-| User's Deals                                               |
-| +-------------------------------------------------------+ |
-| | Acme Corp Deal                                        | |
-| | Created: Jan 29 · Updated: Jan 29 · 2 scenarios       | |
-| +-------------------------------------------------------+ |
-| | Test Deal                                             | |
-| | Created: Jan 29 · Updated: Jan 29 · 3 scenarios       | |
-| +-------------------------------------------------------+ |
-+-----------------------------------------------------------+
-```
-
-### Routing Updates in App.tsx
-Add the admin routes:
+### Props
 ```typescript
-<Route
-  path="/admin"
-  element={
-    <ProtectedRoute>
-      <AdminRoute>
-        <Admin />
-      </AdminRoute>
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/admin/users/:userId"
-  element={
-    <ProtectedRoute>
-      <AdminRoute>
-        <AdminUserDetail />
-      </AdminRoute>
-    </ProtectedRoute>
-  }
-/>
+interface DealSummaryGeneratorProps {
+  deal: Deal;
+  scenarios: Scenario[];
+  lineItemsByScenario: Record<string, LineItem[]>;
+}
 ```
 
-### Admin Access Protection
-Create `AdminRoute` component that:
-- Checks if current user email is yagnavudathu@gmail.com
-- Redirects to home page if not authorized
-- Shows loading state while checking
+### Features
+- **Trigger Button**: Floating action button positioned at bottom-right of the page, styled to match the app's primary color
+- **Dialog/Sheet**: Opens a bottom sheet (mobile) or dialog (desktop) with:
+  - Optional text input for custom prompts/focus areas
+  - Generate button with loading state
+  - Formatted markdown output display
+  - Copy to clipboard button
+  - Regenerate button
+- **Keyboard shortcut**: Consider adding Cmd/Ctrl+G for power users
 
-### Header Updates (Deals.tsx)
-For the admin user, show an "Admin" link in the header:
+### UI States
+1. **Idle**: Shows prompt input and generate button
+2. **Generating**: Loading spinner, disabled inputs
+3. **Success**: Rendered summary with copy/regenerate actions
+4. **Error**: Error message with retry option
+
+---
+
+## Edge Function: generate-deal-summary
+
+### Endpoint
+`POST /functions/v1/generate-deal-summary`
+
+### Request Body
+```typescript
+{
+  deal_id: string;
+  prompt?: string; // Optional user customization
+}
+```
+
+### Logic Flow
+1. Authenticate user via JWT
+2. Fetch deal, scenarios, and line items from database
+3. Calculate totals for each scenario
+4. Build structured context for AI
+5. Call Lovable AI with formatted prompt
+6. Return generated summary
+
+### AI Prompt Strategy
+The prompt will be designed to produce human-friendly, customer-facing content:
+
 ```text
-Deal Scenario Calculator     [Admin] user@email.com [Sign Out]
+System: You are creating a deal summary for a sales account executive to share 
+with their customer. Write in clear, professional language that emphasizes 
+value and savings. Format with markdown headers and bullet points for 
+easy reading.
+
+Context:
+- Deal: {deal.name}
+- View: Customer-facing
+- Scenarios: {scenario summaries with products, quantities, pricing}
+- Totals: {list price, net price, discount, term, savings}
+
+User prompt (if provided): {optional customization}
+
+Generate a summary that includes:
+1. Investment Overview - Clear statement of costs
+2. Your Savings - Quantified discount and savings
+3. What's Included - Products and quantities
+4. Value Proposition - Why this deal makes sense
+
+Keep it concise, positive, and focused on customer value.
+```
+
+### Response Format
+```typescript
+{
+  success: boolean;
+  summary?: string; // Markdown formatted
+  error?: string;
+}
 ```
 
 ---
 
-## Technical Details
+## Hook: useDealSummary
 
-### Available User Metrics from auth.users
-Based on the schema, we can display:
-- **id**: User UUID
-- **email**: User email address
-- **created_at**: Account creation date
-- **last_sign_in_at**: Most recent login timestamp
-- **email_confirmed_at**: Email verification date
-- **raw_app_meta_data.provider**: Auth provider (email/google)
-- **raw_app_meta_data.providers**: Array of linked providers
-- **raw_user_meta_data.full_name**: Name (if Google auth)
-- **raw_user_meta_data.avatar_url**: Profile picture (if Google auth)
+```typescript
+interface UseDealSummaryOptions {
+  dealId: string;
+  onSuccess?: (summary: string) => void;
+  onError?: (error: string) => void;
+}
 
-### Computed Metrics from deals table
-- Deal count per user
-- Total scenarios per user
-- Last deal activity timestamp
+interface UseDealSummaryReturn {
+  generate: (prompt?: string) => Promise<void>;
+  summary: string | null;
+  isGenerating: boolean;
+  error: string | null;
+  reset: () => void;
+}
+```
 
-### Note on IP/Location Data
-Auth logs with IP information are not currently being captured in the analytics database. The admin dashboard will display all available metrics from auth.users and calculated metrics from deals. IP/location tracking would require additional Supabase configuration (auth hooks) which can be added as a future enhancement.
+### Implementation
+- Uses `fetch` to call the edge function (not supabase.functions.invoke for streaming support in future)
+- Manages loading, error, and success states
+- Stores last generated summary in state
+- Handles 429/402 rate limit errors with user-friendly messages
 
-### File Summary
+---
+
+## UI Implementation Details
+
+### Floating Action Button
+```tsx
+<Button
+  onClick={openDialog}
+  className="fixed bottom-6 right-6 h-12 px-5 shadow-lg rounded-full z-50"
+>
+  <Sparkles className="h-4 w-4 mr-2" />
+  Generate Summary
+</Button>
+```
+
+### Summary Output Styling
+- Use prose-like formatting for readability
+- Left-aligned text, generous line height
+- Clear section headers
+- Bullet points for line items
+- Highlighted savings figures (bold or accent color)
+
+### Copy to Clipboard
+```typescript
+const handleCopy = async () => {
+  await navigator.clipboard.writeText(summary);
+  toast({ title: "Copied to clipboard" });
+};
+```
+
+---
+
+## Data Preparation for AI
+
+The edge function will prepare a structured summary of deal data:
+
+```typescript
+interface DealContext {
+  dealName: string;
+  scenarios: Array<{
+    name: string;
+    products: Array<{
+      name: string;
+      quantity: number;
+      netMonthly: number;
+      netAnnual: number;
+      discountPercent: number;
+    }>;
+    totals: {
+      listAnnual: number;
+      netAnnual: number;
+      netTerm: number;
+      blendedDiscount: number;
+      annualSavings: number;
+      termSavings: number;
+    };
+  }>;
+}
+```
+
+---
+
+## Considerations
+
+### Rate Limiting
+- Display friendly error if user hits rate limits
+- Consider debouncing the generate button
+
+### Content Safety
+- AI output is for internal sales use, so content filtering is minimal
+- Summary is ephemeral (not saved to database)
+
+### Future Enhancements
+- Save favorite summaries
+- Export summary as PDF
+- Streaming response for real-time rendering
+- Multiple summary styles (executive brief, detailed breakdown)
+
+---
+
+## File Summary
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `src/pages/Admin.tsx` | Create | Main admin dashboard |
-| `src/pages/AdminUserDetail.tsx` | Create | User detail view |
-| `src/hooks/useAdminAccess.ts` | Create | Admin permission check |
-| `src/hooks/useAdminUsers.ts` | Create | Fetch all users |
-| `src/hooks/useAdminUserDeals.ts` | Create | Fetch user's deals |
-| `src/components/admin/UserCard.tsx` | Create | User list item |
-| `src/components/admin/UserMetricsCard.tsx` | Create | Metrics display |
-| `src/components/admin/AdminHeader.tsx` | Create | Admin header |
-| `src/components/admin/AdminRoute.tsx` | Create | Admin access gate |
-| `src/components/deals/DealCard.tsx` | Modify | Add delete button |
-| `src/components/deals/DealsList.tsx` | Modify | Pass delete handler |
-| `src/hooks/useDeals.ts` | Modify | Add delete mutation |
-| `src/pages/Deals.tsx` | Modify | Add delete dialog, admin link |
-| `src/App.tsx` | Modify | Add admin routes |
-| Database migration | Create | Admin functions |
+| `supabase/functions/generate-deal-summary/index.ts` | Create | AI summary generation endpoint |
+| `src/components/deals/DealSummaryGenerator.tsx` | Create | UI component for summary generation |
+| `src/hooks/useDealSummary.ts` | Create | State management hook |
+| `src/pages/DealDetail.tsx` | Modify | Add floating button and integrate generator |
+| `supabase/config.toml` | Modify | Register new edge function |
 
 ---
 
-## Security Considerations
+## Technical Notes
 
-1. **Admin functions use SECURITY DEFINER** - Runs with elevated privileges but validates caller
-2. **Email-based admin check** - Only yagnavudathu@gmail.com can access admin features
-3. **No client-side bypass** - All data access goes through server-side functions
-4. **RLS maintained** - Regular users still can't access other users' data
-5. **Deal deletion** - Uses existing RLS policies (users can only delete their own deals)
+### Why Edge Function?
+- Keeps AI prompts and logic server-side
+- Protects API key and rate limiting logic
+- Allows fetching deal data with elevated permissions if needed
+- Can be enhanced with streaming in future
+
+### Security
+- Uses existing JWT authentication
+- Only fetches deals belonging to the authenticated user (existing RLS)
+- No data persistence - summary is generated on-demand
+
+### Model Selection
+- Uses `google/gemini-2.5-flash` for fast, cost-effective generation
+- Suitable for the structured summarization task
