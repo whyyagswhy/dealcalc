@@ -73,6 +73,18 @@ export default function DealDetail() {
     return scenarios.filter(s => s.compare_enabled);
   }, [scenarios]);
 
+  // These useCallbacks must be before early returns to satisfy React hooks rules
+  const handleDisplayModeChange = useCallback((value: DisplayMode | null) => {
+    if (value && dealId) {
+      updateDeal.mutate({ id: dealId, updates: { display_mode: value } });
+    }
+  }, [dealId, updateDeal]);
+
+  const handleViewModeChange = useCallback((value: ViewMode) => {
+    if (dealId) {
+      updateDeal.mutate({ id: dealId, updates: { view_mode: value } });
+    }
+  }, [dealId, updateDeal]);
   const handleAddScenario = async () => {
     if (!dealId) return;
     
@@ -189,15 +201,6 @@ export default function DealDetail() {
   const hasScenarios = scenarios.length > 0;
   const showComparison = deal.view_mode === 'customer' && comparisonScenarios.length >= 2;
 
-  const handleDisplayModeChange = useCallback((value: DisplayMode | null) => {
-    if (value) {
-      updateDeal.mutate({ id: dealId!, updates: { display_mode: value } });
-    }
-  }, [dealId, updateDeal]);
-
-  const handleViewModeChange = useCallback((value: ViewMode) => {
-    updateDeal.mutate({ id: dealId!, updates: { view_mode: value } });
-  }, [dealId, updateDeal]);
 
   return (
     <div className="min-h-screen bg-background">
