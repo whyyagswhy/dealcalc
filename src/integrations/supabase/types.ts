@@ -257,6 +257,33 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_all_users_for_admin: {
+        Args: { _admin_user_id: string }
+        Returns: {
+          created_at: string
+          deal_count: number
+          email: string
+          email_confirmed_at: string
+          id: string
+          last_deal_activity: string
+          last_sign_in_at: string
+          raw_app_meta_data: Json
+          raw_user_meta_data: Json
+          scenario_count: number
+        }[]
+      }
+      get_user_deals_for_admin: {
+        Args: { _admin_user_id: string; _target_user_id: string }
+        Returns: {
+          created_at: string
+          display_mode: string
+          id: string
+          name: string
+          scenario_count: number
+          updated_at: string
+          view_mode: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -265,6 +292,7 @@ export type Database = {
         Returns: boolean
       }
       has_sales_access: { Args: { _user_id: string }; Returns: boolean }
+      is_admin_user: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "sales_rep" | "viewer"

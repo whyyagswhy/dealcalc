@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDeals } from '@/hooks/useDeals';
+import { useDeals, useDeleteDeal } from '@/hooks/useDeals';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,15 +15,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { LogOut, Plus, Loader2, Search, X, FileText } from 'lucide-react';
+import { LogOut, Plus, Loader2, Search, X, FileText, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { DealsList } from '@/components/deals/DealsList';
 import { SearchInput } from '@/components/deals/SearchInput';
+import { DeleteDealDialog } from '@/components/deals/DeleteDealDialog';
+import type { DealListItem } from '@/lib/types';
 
 export default function Deals() {
   const { user, signOut } = useAuth();
+  const { isAdmin } = useAdminAccess();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -29,8 +34,10 @@ export default function Deals() {
   const [dealName, setDealName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [dealToDelete, setDealToDelete] = useState<DealListItem | null>(null);
   
   const debouncedSearch = useDebounce(searchQuery, 300);
+  const deleteDealMutation = useDeleteDeal();
   
   const {
     data,
@@ -84,6 +91,30 @@ export default function Deals() {
     setIsCreateDialogOpen(true);
   };
 
+  const handleDeleteDeal = (deal: DealListItem) => {
+    setDealToDelete(deal);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!dealToDelete) return;
+    
+    try {
+      await deleteDealMutation.mutateAsync(dealToDelete.id);
+      toast({
+        title: 'Deal Deleted',
+        description: `"${dealToDelete.name}" has been deleted.`,
+      });
+      setDealToDelete(null);
+    } catch (error) {
+      if (import.meta.env.DEV) console.error('Error deleting deal:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete deal. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const isEmpty = !isLoading && deals.length === 0 && !searchQuery;
   const noResults = !isLoading && deals.length === 0 && searchQuery;
 
@@ -93,7 +124,15 @@ export default function Deals() {
       <header className="border-b border-border bg-card shadow-card">
         <div className="mx-auto flex h-16 sm:h-20 max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-foreground">Deal Scenario Calculator</h1>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            {isAdmin && (
+              <Button variant="ghost" size="sm" asChild className="min-h-[44px]">
+                <Link to="/admin">
+                  <Shield className="h-4 w-4" />
+                  <span className="ml-2 hidden sm:inline">Admin</span>
+                </Link>
+              </Button>
+            )}
             <span className="hidden text-sm text-muted-foreground sm:inline">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={signOut} className="min-h-[44px]">
               <LogOut className="h-4 w-4" />
@@ -177,6 +216,7 @@ export default function Deals() {
                 hasNextPage={hasNextPage || false}
                 isFetchingNextPage={isFetchingNextPage}
                 fetchNextPage={fetchNextPage}
+                onDelete={handleDeleteDeal}
               />
             )}
           </div>
@@ -234,6 +274,15 @@ export default function Deals() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Deal Dialog */}
+      <DeleteDealDialog
+        open={!!dealToDelete}
+        onOpenChange={(open) => !open && setDealToDelete(null)}
+        dealName={dealToDelete?.name || ''}
+        onConfirm={handleConfirmDelete}
+        isDeleting={deleteDealMutation.isPending}
+      />
     </div>
   );
 }

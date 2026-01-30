@@ -10,13 +10,15 @@ interface DealsListProps {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   fetchNextPage: () => void;
+  onDelete: (deal: DealListItem) => void;
 }
 
 export function DealsList({ 
   deals, 
   hasNextPage, 
   isFetchingNextPage, 
-  fetchNextPage 
+  fetchNextPage,
+  onDelete,
 }: DealsListProps) {
   const navigate = useNavigate();
   const parentRef = useRef<HTMLDivElement>(null);
@@ -74,6 +76,7 @@ export function DealsList({
               <DealCard
                 deal={deal}
                 onClick={() => navigate(`/deals/${deal.id}`)}
+                onDelete={onDelete}
               />
             </div>
           );
