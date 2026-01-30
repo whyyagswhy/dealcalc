@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Line item validation schema with business-appropriate limits
 export const lineItemSchema = z.object({
-  product_name: z.string().trim().min(1, 'Product name is required').max(200, 'Product name must be less than 200 characters'),
+  product_name: z.string().trim().max(200, 'Product name must be less than 200 characters'),
   list_unit_price: z.number().min(0, 'Price must be 0 or greater').max(1000000, 'Price cannot exceed $1,000,000').finite(),
   quantity: z.number().int('Quantity must be a whole number').min(0, 'Quantity must be 0 or greater').max(100000, 'Quantity cannot exceed 100,000'),
   term_months: z.number().int('Term must be a whole number').min(1, 'Term must be at least 1 month').max(120, 'Term cannot exceed 120 months'),
