@@ -5,17 +5,20 @@ import { useScenarios, useCreateScenario, useUpdateScenario, useDeleteScenario, 
 import { useCreateLineItem } from '@/hooks/useLineItems';
 import { useAutosave } from '@/hooks/useAutosave';
 import { useSalesAccess } from '@/hooks/useSalesAccess';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SaveStatusIndicator } from '@/components/deals/SaveStatusIndicator';
 import { DealToolbar } from '@/components/deals/DealToolbar';
 import { ImportContractDialog } from '@/components/deals/ImportContractDialog';
 import { DealSummaryGenerator } from '@/components/deals/DealSummaryGenerator';
+import { DisplayModeToggle } from '@/components/scenarios/DisplayModeToggle';
+import { ViewModeToggle } from '@/components/deals/ViewModeToggle';
 import { ScenarioCard } from '@/components/scenarios/ScenarioCard';
 import { ScenarioComparison } from '@/components/scenarios/ScenarioComparison';
 import { AccessDenied } from '@/components/AccessDenied';
 import { ArrowLeft, Plus, Loader2 } from 'lucide-react';
-import type { Deal } from '@/lib/types';
+import type { Deal, DisplayMode, ViewMode } from '@/lib/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +33,7 @@ import {
 export default function DealDetail() {
   const { dealId } = useParams<{ dealId: string }>();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { data: deal, isLoading, isError } = useDeal(dealId);
   const { data: scenarios = [], isLoading: scenariosLoading } = useScenarios(dealId);
   const { data: hasSalesAccess, isLoading: accessLoading } = useSalesAccess();
@@ -185,43 +189,108 @@ export default function DealDetail() {
   const hasScenarios = scenarios.length > 0;
   const showComparison = deal.view_mode === 'customer' && comparisonScenarios.length >= 2;
 
+  const handleDisplayModeChange = useCallback((value: DisplayMode | null) => {
+    if (value) {
+      updateDeal.mutate({ id: dealId!, updates: { display_mode: value } });
+    }
+  }, [dealId, updateDeal]);
+
+  const handleViewModeChange = useCallback((value: ViewMode) => {
+    updateDeal.mutate({ id: dealId!, updates: { view_mode: value } });
+  }, [dealId, updateDeal]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card shadow-card">
-        <div className="mx-auto flex h-16 sm:h-20 max-w-[1400px] items-center px-4 sm:px-6 lg:px-8">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => navigate('/')}
-            className="shrink-0 min-h-[44px] min-w-[44px] mr-4"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="ml-2 hidden sm:inline">Back</span>
-          </Button>
+      {isMobile ? (
+        /* Mobile: Stacked 3-row layout */
+        <header className="border-b border-border bg-card shadow-card overflow-x-hidden">
+          {/* Row 1: Navigation + Actions */}
+          <div className="flex items-center justify-between px-4 py-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/')}
+              className="shrink-0 min-h-[44px] min-w-[44px]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="ml-2">Back</span>
+            </Button>
+            <div className="flex items-center gap-2">
+              <ImportContractDialog 
+                dealId={dealId!} 
+                onImportComplete={handleImportContract} 
+              />
+              <DealToolbar 
+                deal={deal} 
+                onUpdate={(updates: Partial<Deal>) => updateDeal.mutate({ id: dealId!, updates })} 
+              />
+            </div>
+          </div>
           
-          <div className="flex flex-1 items-center gap-3 min-w-0">
+          {/* Row 2: Deal Name */}
+          <div className="flex items-center gap-2 px-4 py-2 border-t border-border/50">
             <Input
               value={dealName}
               onChange={(e) => setDealName(e.target.value)}
-              className="max-w-md border-transparent bg-transparent text-lg sm:text-xl lg:text-2xl font-semibold hover:border-input focus:border-input"
+              className="flex-1 border-transparent bg-transparent text-lg font-semibold hover:border-input focus:border-input"
               placeholder="Deal name"
             />
             <SaveStatusIndicator status={status} onRetry={retry} />
           </div>
           
-          <div className="flex items-center gap-3 ml-4">
-            <ImportContractDialog 
-              dealId={dealId!} 
-              onImportComplete={handleImportContract} 
+          {/* Row 3: Toggles */}
+          <div className="flex items-center justify-between px-4 py-2 border-t border-border/50">
+            <DisplayModeToggle
+              value={deal.display_mode as DisplayMode}
+              onChange={handleDisplayModeChange}
+              size="xs"
+              showInherit={false}
             />
-            <DealToolbar 
-              deal={deal} 
-              onUpdate={(updates: Partial<Deal>) => updateDeal.mutate({ id: dealId!, updates })} 
+            <ViewModeToggle
+              value={deal.view_mode as ViewMode}
+              onChange={handleViewModeChange}
+              size="xs"
             />
           </div>
-        </div>
-      </header>
+        </header>
+      ) : (
+        /* Desktop: Single-row layout */
+        <header className="border-b border-border bg-card shadow-card">
+          <div className="mx-auto flex h-16 sm:h-20 max-w-[1400px] items-center px-4 sm:px-6 lg:px-8">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/')}
+              className="shrink-0 min-h-[44px] min-w-[44px] mr-4"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="ml-2 hidden sm:inline">Back</span>
+            </Button>
+            
+            <div className="flex flex-1 items-center gap-3 min-w-0">
+              <Input
+                value={dealName}
+                onChange={(e) => setDealName(e.target.value)}
+                className="max-w-md border-transparent bg-transparent text-lg sm:text-xl lg:text-2xl font-semibold hover:border-input focus:border-input"
+                placeholder="Deal name"
+              />
+              <SaveStatusIndicator status={status} onRetry={retry} />
+            </div>
+            
+            <div className="flex items-center gap-3 ml-4">
+              <ImportContractDialog 
+                dealId={dealId!} 
+                onImportComplete={handleImportContract} 
+              />
+              <DealToolbar 
+                deal={deal} 
+                onUpdate={(updates: Partial<Deal>) => updateDeal.mutate({ id: dealId!, updates })} 
+              />
+            </div>
+          </div>
+        </header>
+      )}
 
       {/* Main Content */}
       <main className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12">
