@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { FileImage, Upload, Loader2, AlertCircle, CheckCircle2, Trash2, Plus } from 'lucide-react';
+import { FileImage, Upload, Loader2, AlertCircle, CheckCircle2, Trash2, Plus, AlertTriangle, Check } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface ExtractedLineItem {
   product_name: string;
@@ -22,6 +24,11 @@ interface ExtractedLineItem {
   term_months: number;
   discount_percent: number | null;
   net_unit_price: number | null;
+  // Matching fields
+  original_product_name?: string;
+  matched_product_name?: string | null;
+  matched_list_price?: number | null;
+  match_confidence?: 'high' | 'medium' | 'low' | 'none';
 }
 
 interface ExtractionResult {
@@ -51,16 +58,14 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type (images and PDFs)
     const isImage = file.type.startsWith('image/');
-    const isPdf = file.type === 'application/pdf';
+    const isPdfFile = file.type === 'application/pdf';
     
-    if (!isImage && !isPdf) {
+    if (!isImage && !isPdfFile) {
       setError('Please select an image (PNG, JPG) or PDF file');
       return;
     }
 
-    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       setError('File size must be less than 10MB');
       return;
@@ -70,9 +75,8 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
     setExtractionResult(null);
     setEditableItems([]);
     setFileName(file.name);
-    setIsPdf(isPdf);
+    setIsPdf(isPdfFile);
 
-    // Create preview and base64
     const reader = new FileReader();
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
@@ -101,11 +105,21 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
       }
 
       setExtractionResult(data.data);
-      // Initialize editable items with extracted data
       setEditableItems([...data.data.line_items]);
       
       if (data.data.line_items.length === 0) {
         setError('No line items could be extracted from this image. Try a clearer screenshot.');
+      } else {
+        // Count matched products
+        const matchedCount = data.data.line_items.filter(
+          (item: ExtractedLineItem) => item.match_confidence && item.match_confidence !== 'none'
+        ).length;
+        if (matchedCount > 0) {
+          toast({
+            title: 'Products matched',
+            description: `${matchedCount} of ${data.data.line_items.length} products matched to price book`,
+          });
+        }
       }
     } catch (err) {
       if (import.meta.env.DEV) console.error('Extraction error:', err);
@@ -137,6 +151,7 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
         term_months: 12,
         discount_percent: null,
         net_unit_price: null,
+        match_confidence: 'none',
       },
     ]);
   };
@@ -144,7 +159,6 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
   const handleImport = async () => {
     if (editableItems.length === 0) return;
 
-    // Validate all items have product names
     const invalidItems = editableItems.filter(item => !item.product_name.trim());
     if (invalidItems.length > 0) {
       setError('All line items must have a product name');
@@ -193,6 +207,44 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
     return colors[confidence as keyof typeof colors] || colors.medium;
   };
 
+  const getMatchIcon = (confidence?: 'high' | 'medium' | 'low' | 'none') => {
+    if (!confidence || confidence === 'none') {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>No price book match found</p>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+    
+    const colors = {
+      high: 'text-green-600',
+      medium: 'text-blue-600',
+      low: 'text-amber-600',
+    };
+    
+    const labels = {
+      high: 'Exact match',
+      medium: 'Likely match',
+      low: 'Possible match',
+    };
+    
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Check className={cn('h-4 w-4 shrink-0', colors[confidence])} />
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{labels[confidence]}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  };
+
   const parseNumber = (value: string): number => {
     const parsed = parseFloat(value);
     return isNaN(parsed) ? 0 : parsed;
@@ -212,11 +264,11 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
           Import Contract
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Import Contract Screenshot</DialogTitle>
           <DialogDescription>
-            Upload a screenshot of an existing contract to automatically extract line items.
+            Upload a screenshot of an existing contract to automatically extract and match line items to the price book.
           </DialogDescription>
         </DialogHeader>
 
@@ -278,7 +330,7 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
                 {editableItems.length === 0 && !isProcessing && (
                   <Button onClick={handleExtract} className="w-full" disabled={isProcessing}>
                     <FileImage className="mr-2 h-4 w-4" />
-                    Extract Line Items
+                    Extract & Match Products
                   </Button>
                 )}
               </div>
@@ -290,7 +342,7 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
             <div className="flex items-center justify-center gap-2 py-4">
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
               <span className="text-sm text-muted-foreground">
-                {editableItems.length > 0 ? 'Creating scenario...' : 'Analyzing contract...'}
+                {editableItems.length > 0 ? 'Creating scenario...' : 'Extracting and matching products...'}
               </span>
             </div>
           )}
@@ -304,119 +356,147 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
           )}
 
           {/* Editable Extraction Result */}
-          {editableItems.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <span className="font-medium">
-                    {editableItems.length} line item{editableItems.length !== 1 ? 's' : ''}
-                  </span>
+          <TooltipProvider>
+            {editableItems.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="font-medium">
+                      {editableItems.length} line item{editableItems.length !== 1 ? 's' : ''}
+                    </span>
+                    {editableItems.some(i => i.match_confidence && i.match_confidence !== 'none') && (
+                      <span className="text-sm text-muted-foreground">
+                        ({editableItems.filter(i => i.match_confidence && i.match_confidence !== 'none').length} matched)
+                      </span>
+                    )}
+                  </div>
+                  {extractionResult && (
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getConfidenceBadge(extractionResult.confidence)}`}>
+                      {extractionResult.confidence} confidence
+                    </span>
+                  )}
                 </div>
-                {extractionResult && (
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getConfidenceBadge(extractionResult.confidence)}`}>
-                    {extractionResult.confidence} confidence
-                  </span>
+
+                {extractionResult?.notes && (
+                  <p className="text-sm text-muted-foreground bg-muted p-2 rounded">{extractionResult.notes}</p>
                 )}
-              </div>
 
-              {extractionResult?.notes && (
-                <p className="text-sm text-muted-foreground bg-muted p-2 rounded">{extractionResult.notes}</p>
-              )}
+                <p className="text-sm text-muted-foreground">
+                  Review the matched products below. <Check className="inline h-3 w-3 text-green-600" /> indicates a price book match.
+                </p>
 
-              <p className="text-sm text-muted-foreground">
-                Review and edit the extracted data below before importing.
-              </p>
-
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="px-2 py-2 text-left font-medium">Product</th>
-                      <th className="px-2 py-2 text-right font-medium w-16">Qty</th>
-                      <th className="px-2 py-2 text-right font-medium w-24">List $/mo</th>
-                      <th className="px-2 py-2 text-right font-medium w-24">Net $/mo</th>
-                      <th className="px-2 py-2 text-right font-medium w-16">Term</th>
-                      <th className="px-2 py-2 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {editableItems.map((item, idx) => (
-                      <tr key={idx} className="group">
-                        <td className="px-2 py-1">
-                          <Input
-                            value={item.product_name}
-                            onChange={(e) => handleUpdateItem(idx, 'product_name', e.target.value)}
-                            className="h-8 text-sm"
-                            placeholder="Product name"
-                          />
-                        </td>
-                        <td className="px-2 py-1">
-                          <Input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => handleUpdateItem(idx, 'quantity', parseInt(e.target.value) || 1)}
-                            className="h-8 text-sm text-right w-16"
-                            min={1}
-                          />
-                        </td>
-                        <td className="px-2 py-1">
-                          <Input
-                            type="number"
-                            value={item.list_unit_price}
-                            onChange={(e) => handleUpdateItem(idx, 'list_unit_price', parseNumber(e.target.value))}
-                            className="h-8 text-sm text-right w-24"
-                            step="0.01"
-                            min={0}
-                          />
-                        </td>
-                        <td className="px-2 py-1">
-                          <Input
-                            type="number"
-                            value={item.net_unit_price ?? ''}
-                            onChange={(e) => handleUpdateItem(idx, 'net_unit_price', parseNullableNumber(e.target.value))}
-                            className="h-8 text-sm text-right w-24"
-                            step="0.01"
-                            min={0}
-                            placeholder="-"
-                          />
-                        </td>
-                        <td className="px-2 py-1">
-                          <Input
-                            type="number"
-                            value={item.term_months}
-                            onChange={(e) => handleUpdateItem(idx, 'term_months', parseInt(e.target.value) || 12)}
-                            className="h-8 text-sm text-right w-16"
-                            min={1}
-                          />
-                        </td>
-                        <td className="px-2 py-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteItem(idx)}
-                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="px-1 py-2 w-6"></th>
+                        <th className="px-2 py-2 text-left font-medium">Product</th>
+                        <th className="px-2 py-2 text-right font-medium w-16">Qty</th>
+                        <th className="px-2 py-2 text-right font-medium w-24">List $/mo</th>
+                        <th className="px-2 py-2 text-right font-medium w-24">Net $/mo</th>
+                        <th className="px-2 py-2 text-right font-medium w-16">Term</th>
+                        <th className="px-2 py-2 w-10"></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {editableItems.map((item, idx) => (
+                        <tr key={idx} className="group">
+                          <td className="px-1 py-1 text-center">
+                            {getMatchIcon(item.match_confidence)}
+                          </td>
+                          <td className="px-2 py-1">
+                            <div className="space-y-0.5">
+                              <Input
+                                value={item.product_name}
+                                onChange={(e) => handleUpdateItem(idx, 'product_name', e.target.value)}
+                                className="h-8 text-sm"
+                                placeholder="Product name"
+                              />
+                              {item.original_product_name && item.original_product_name !== item.product_name && (
+                                <p className="text-xs text-muted-foreground truncate" title={item.original_product_name}>
+                                  Original: {item.original_product_name}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-1">
+                            <Input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => handleUpdateItem(idx, 'quantity', parseInt(e.target.value) || 1)}
+                              className="h-8 text-sm text-right w-16"
+                              min={1}
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <div className="space-y-0.5">
+                              <Input
+                                type="number"
+                                value={item.list_unit_price}
+                                onChange={(e) => handleUpdateItem(idx, 'list_unit_price', parseNumber(e.target.value))}
+                                className={cn(
+                                  "h-8 text-sm text-right w-24",
+                                  item.matched_list_price !== null && item.matched_list_price !== undefined && "border-green-300"
+                                )}
+                                step="0.01"
+                                min={0}
+                              />
+                              {item.matched_list_price !== null && item.matched_list_price !== undefined && (
+                                <p className="text-xs text-green-600 text-right">
+                                  from price book
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-1">
+                            <Input
+                              type="number"
+                              value={item.net_unit_price ?? ''}
+                              onChange={(e) => handleUpdateItem(idx, 'net_unit_price', parseNullableNumber(e.target.value))}
+                              className="h-8 text-sm text-right w-24"
+                              step="0.01"
+                              min={0}
+                              placeholder="-"
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <Input
+                              type="number"
+                              value={item.term_months}
+                              onChange={(e) => handleUpdateItem(idx, 'term_months', parseInt(e.target.value) || 12)}
+                              className="h-8 text-sm text-right w-16"
+                              min={1}
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteItem(idx)}
+                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddItem}
-                className="w-full"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Line Item
-              </Button>
-            </div>
-          )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddItem}
+                  className="w-full"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Line Item
+                </Button>
+              </div>
+            )}
+          </TooltipProvider>
         </div>
 
         <DialogFooter>

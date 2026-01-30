@@ -15,10 +15,25 @@ interface ExtractedLineItem {
   net_unit_price: number | null;
 }
 
+interface MatchedLineItem extends ExtractedLineItem {
+  original_product_name: string;
+  matched_product_name: string | null;
+  matched_list_price: number | null;
+  match_confidence: 'high' | 'medium' | 'low' | 'none';
+}
+
 interface ExtractionResult {
-  line_items: ExtractedLineItem[];
+  line_items: MatchedLineItem[];
   confidence: string;
   notes: string;
+}
+
+interface PriceBookProduct {
+  product_name: string;
+  category: string;
+  edition: string | null;
+  monthly_list_price: number | null;
+  annual_list_price: number;
 }
 
 // Detect file type from data URL or base64
@@ -31,12 +46,185 @@ function detectFileType(dataUrl: string): { mimeType: string; isSupported: boole
       return { mimeType, isSupported };
     }
   }
-  // Default to image/png for raw base64
   return { mimeType: 'image/png', isSupported: true };
 }
 
+// Format product name for discount matrix: "[Edition] Category"
+function formatProductName(category: string, edition: string | null): string {
+  if (edition) {
+    return `[${edition}] ${category}`;
+  }
+  return category;
+}
+
+// Get monthly price from product
+function getMonthlyPrice(product: PriceBookProduct): number {
+  if (product.monthly_list_price !== null) {
+    return product.monthly_list_price;
+  }
+  return product.annual_list_price / 12;
+}
+
+// Match products to price book using AI
+async function matchProductsToBook(
+  lineItems: ExtractedLineItem[],
+  priceBookProducts: PriceBookProduct[],
+  apiKey: string
+): Promise<MatchedLineItem[]> {
+  if (lineItems.length === 0) {
+    return [];
+  }
+
+  // Build a summary of available products for the AI
+  const uniqueProducts = new Map<string, PriceBookProduct>();
+  for (const p of priceBookProducts) {
+    const key = formatProductName(p.category, p.edition);
+    if (!uniqueProducts.has(key)) {
+      uniqueProducts.set(key, p);
+    }
+  }
+
+  const productList = Array.from(uniqueProducts.entries())
+    .map(([name, p]) => `- ${name} ($${getMonthlyPrice(p).toFixed(2)}/mo)`)
+    .join('\n');
+
+  const extractedList = lineItems
+    .map((item, idx) => `${idx + 1}. "${item.product_name}"`)
+    .join('\n');
+
+  console.log(`Matching ${lineItems.length} products to ${uniqueProducts.size} price book entries`);
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        {
+          role: 'system',
+          content: `You are matching product names from a sales contract to a Salesforce price book.
+Your task is to find the best match from the price book for each extracted product name.
+
+The price book uses this naming format: [Edition] Category
+For example: "[Enterprise] Sales Cloud", "[Unlimited] Service Cloud", "[Professional] Einstein Analytics"
+
+Common variations you might see in contracts:
+- "Sales Cloud Enterprise" → "[Enterprise] Sales Cloud"
+- "Salesforce Service - Unlimited" → "[Unlimited] Service Cloud"
+- "SF Sales Enterprise Edition" → "[Enterprise] Sales Cloud"
+- "Platform Plus - Developer" → "[Developer] Platform Plus"
+
+Match based on semantic meaning, not exact string matching.
+If no good match exists (e.g., custom or third-party products), return null for the match.`
+        },
+        {
+          role: 'user',
+          content: `Price Book Products:\n${productList}\n\nExtracted Products to Match:\n${extractedList}\n\nFor each extracted product, find the best match from the price book.`
+        }
+      ],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'match_products',
+            description: 'Match extracted product names to price book entries',
+            parameters: {
+              type: 'object',
+              properties: {
+                matches: {
+                  type: 'array',
+                  description: 'Array of matches for each extracted product (in same order)',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      matched_name: {
+                        type: 'string',
+                        nullable: true,
+                        description: 'The matched product name from price book in [Edition] Category format, or null if no match'
+                      },
+                      confidence: {
+                        type: 'string',
+                        enum: ['high', 'medium', 'low', 'none'],
+                        description: 'Confidence level: high (exact match), medium (likely match), low (possible match), none (no match)'
+                      }
+                    },
+                    required: ['matched_name', 'confidence']
+                  }
+                }
+              },
+              required: ['matches']
+            }
+          }
+        }
+      ],
+      tool_choice: { type: 'function', function: { name: 'match_products' } }
+    }),
+  });
+
+  if (!response.ok) {
+    console.error('AI matching failed:', response.status);
+    // Return items without matching on failure
+    return lineItems.map(item => ({
+      ...item,
+      original_product_name: item.product_name,
+      matched_product_name: null,
+      matched_list_price: null,
+      match_confidence: 'none' as const,
+    }));
+  }
+
+  const data = await response.json();
+  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+  
+  if (!toolCall || toolCall.function.name !== 'match_products') {
+    console.error('Unexpected AI response format for matching');
+    return lineItems.map(item => ({
+      ...item,
+      original_product_name: item.product_name,
+      matched_product_name: null,
+      matched_list_price: null,
+      match_confidence: 'none' as const,
+    }));
+  }
+
+  const matchResults = JSON.parse(toolCall.function.arguments);
+  console.log('Match results:', JSON.stringify(matchResults));
+
+  // Combine line items with their matches
+  return lineItems.map((item, idx) => {
+    const match = matchResults.matches[idx];
+    const matchedName = match?.matched_name || null;
+    const confidence = match?.confidence || 'none';
+    
+    // Find the matched product in the price book to get its price
+    let matchedPrice: number | null = null;
+    if (matchedName) {
+      const product = uniqueProducts.get(matchedName);
+      if (product) {
+        matchedPrice = getMonthlyPrice(product);
+      }
+    }
+
+    return {
+      ...item,
+      original_product_name: item.product_name,
+      matched_product_name: matchedName,
+      matched_list_price: matchedPrice,
+      match_confidence: confidence as 'high' | 'medium' | 'low' | 'none',
+      // If matched, use the matched name as product_name for the final result
+      product_name: matchedName || item.product_name,
+      // If matched and confidence is high/medium, use price book price
+      list_unit_price: (matchedPrice !== null && (confidence === 'high' || confidence === 'medium')) 
+        ? matchedPrice 
+        : item.list_unit_price,
+    };
+  });
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -103,12 +291,24 @@ serve(async (req) => {
     const isPdf = mimeType === 'application/pdf';
     console.log(`Processing contract ${isPdf ? 'PDF' : 'image'} for extraction...`);
 
-    // Prepare the file URL (handle both data URL and raw base64)
+    // Fetch price book products for matching
+    console.log('Fetching price book products...');
+    const { data: priceBookProducts, error: pbError } = await supabaseClient
+      .from('price_book_products')
+      .select('product_name, category, edition, monthly_list_price, annual_list_price');
+    
+    if (pbError) {
+      console.error('Failed to fetch price book:', pbError.message);
+    }
+    console.log(`Fetched ${priceBookProducts?.length || 0} price book products`);
+
+    // Prepare the file URL
     const fileUrl = file_base64.startsWith('data:') 
       ? file_base64 
       : `data:${mimeType};base64,${file_base64}`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Step 1: Extract line items from image
+    const extractResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
@@ -123,7 +323,7 @@ serve(async (req) => {
 Your task is to extract line items from contract screenshots with high accuracy.
 
 For each line item found, extract:
-- product_name: The name of the product/service
+- product_name: The name of the product/service exactly as shown
 - list_unit_price: The list/retail price per unit (monthly if possible, otherwise convert annual to monthly by dividing by 12)
 - quantity: The number of units/seats/licenses
 - term_months: Contract term in months (e.g., 12 for 1 year, 36 for 3 years)
@@ -168,7 +368,7 @@ Important:
                       properties: {
                         product_name: { 
                           type: 'string', 
-                          description: 'Name of the product or service' 
+                          description: 'Name of the product or service exactly as shown' 
                         },
                         list_unit_price: { 
                           type: 'number', 
@@ -215,47 +415,72 @@ Important:
       }),
     });
 
-    if (!response.ok) {
-      if (response.status === 429) {
+    if (!extractResponse.ok) {
+      if (extractResponse.status === 429) {
         return new Response(
           JSON.stringify({ success: false, error: 'Rate limit exceeded. Please try again later.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      if (response.status === 402) {
+      if (extractResponse.status === 402) {
         return new Response(
           JSON.stringify({ success: false, error: 'AI credits exhausted. Please add credits to continue.' }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
+      const errorText = await extractResponse.text();
+      console.error('AI gateway error:', extractResponse.status, errorText);
       return new Response(
         JSON.stringify({ success: false, error: 'Failed to process image' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const data = await response.json();
-    console.log('AI response received');
+    const extractData = await extractResponse.json();
+    console.log('AI extraction response received');
 
-    // Extract the tool call result
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    const toolCall = extractData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall || toolCall.function.name !== 'extract_contract_line_items') {
-      console.error('Unexpected AI response format:', JSON.stringify(data));
+      console.error('Unexpected AI response format:', JSON.stringify(extractData));
       return new Response(
         JSON.stringify({ success: false, error: 'Failed to extract data from image' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const extractedData: ExtractionResult = JSON.parse(toolCall.function.arguments);
+    const extractedData = JSON.parse(toolCall.function.arguments);
     console.log(`Extracted ${extractedData.line_items.length} line items with ${extractedData.confidence} confidence`);
+
+    // Step 2: Match products to price book
+    let matchedLineItems: MatchedLineItem[];
+    if (priceBookProducts && priceBookProducts.length > 0 && extractedData.line_items.length > 0) {
+      console.log('Starting product matching...');
+      matchedLineItems = await matchProductsToBook(
+        extractedData.line_items,
+        priceBookProducts as PriceBookProduct[],
+        LOVABLE_API_KEY
+      );
+      const matchedCount = matchedLineItems.filter(i => i.match_confidence !== 'none').length;
+      console.log(`Matched ${matchedCount}/${matchedLineItems.length} products to price book`);
+    } else {
+      // No price book or no items to match
+      matchedLineItems = extractedData.line_items.map((item: ExtractedLineItem) => ({
+        ...item,
+        original_product_name: item.product_name,
+        matched_product_name: null,
+        matched_list_price: null,
+        match_confidence: 'none' as const,
+      }));
+    }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        data: extractedData 
+        data: {
+          line_items: matchedLineItems,
+          confidence: extractedData.confidence,
+          notes: extractedData.notes,
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
