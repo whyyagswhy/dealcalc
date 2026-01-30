@@ -1,304 +1,166 @@
 
-# Deal Summary Generator - Implementation Plan
+# Mobile UI Improvements Plan
 
-## Overview
-Add a one-click AI-powered summary generator to the Deal Detail page that creates customer-ready talking points and value propositions. The feature includes a floating action button with an optional prompt field for customization, generating clear, human-formatted summaries that highlight savings, value, and key deal points.
+## Problem Analysis
+Looking at the screenshot, the Deal Detail page has several mobile layout issues:
+1. The header is overcrowded - too many controls fighting for horizontal space
+2. The deal name field is not visible (likely squeezed out)
+3. Toggle buttons (Monthly/Annual, Internal/Customer) take up too much space on small screens
+4. The toolbar controls don't adapt well to narrow viewports
 
 ---
 
-## User Experience Flow
+## Solution: Two-Row Mobile Header
+
+Restructure the header to use a stacked layout on mobile devices:
 
 ```text
-+------------------------------------------+
-|  Deal Header (Acme Corp Deal)            |
-|  [Monthly/Annual] [Internal/Customer] ⋮  |
-+------------------------------------------+
-|                                          |
-|  Scenarios...                            |
-|                                          |
-+------------------------------------------+
-                     |
-                     v
-    +------------------------------------+
-    |  [✨ Generate Summary]  floating   |
-    +------------------------------------+
-                     |
-        Click opens bottom sheet/dialog
-                     v
-    +------------------------------------+
-    | Generate Deal Summary              |
-    |------------------------------------|
-    | Optional: Add context for AI       |
-    | [Focus on multi-year savings...  ] |
-    |                                    |
-    | [✨ Generate]                      |
-    +------------------------------------+
-                     |
-                     v
-    +------------------------------------+
-    | Deal Summary                       |
-    |------------------------------------|
-    | ## Acme Corp Deal                  |
-    |                                    |
-    | ### Investment Overview            |
-    | Your annual investment: $48,000    |
-    | Term total: $144,000 (3 years)     |
-    |                                    |
-    | ### Your Savings                   |
-    | - 22% discount off list price      |
-    | - Annual savings: $13,500          |
-    | - Total savings over 3 years:      |
-    |   $40,500                          |
-    |                                    |
-    | ### What's Included               |
-    | - 50 seats of Sales Cloud         |
-    | - 50 seats of Service Cloud       |
-    | - Einstein Analytics              |
-    |                                    |
-    | ### Salesforce’s Incentives and Concessions |
-    | [AI-generated value proposition]   |
-    |------------------------------------|
-    | [📋 Copy] [⟳ Regenerate] [✕ Close] |
-    +------------------------------------+
+CURRENT (broken):
++---------------------------------------------------+
+| ← | [Deal Name...] | [Import] [M|A] [I|C] ⋮       |
++---------------------------------------------------+
+
+PROPOSED:
++---------------------------------------------------+
+| ← Back                             [Import] ⋮     |  <- Row 1: Navigation
+|---------------------------------------------------|
+| Deal Name                              [Saved]    |  <- Row 2: Title
+|---------------------------------------------------|
+| [Monthly|Annual]    [Internal|Customer]           |  <- Row 3: Toggles
++---------------------------------------------------+
 ```
 
 ---
 
-## Technical Architecture
+## Implementation Details
 
-### New Files
+### 1. Restructure DealDetail.tsx Header (Mobile Layout)
 
-| File | Purpose |
+The header will conditionally render a different structure on mobile:
+
+**Mobile (< 640px):**
+- Row 1: Back button + Import Contract (icon only) + Overflow menu
+- Row 2: Full-width deal name input with save indicator
+- Row 3: Display toggles (Monthly/Annual and Internal/Customer) spanning full width
+
+**Desktop (>= 640px):**
+- Keep the current single-row layout (it works fine)
+
+### 2. Update DealToolbar.tsx
+
+Modify the mobile version to optionally render toggles as a full-width row (passed as a separate render prop or flag) rather than inline with other controls.
+
+### 3. Update ImportContractDialog.tsx
+
+On mobile, show only the icon (no "Import Contract" text) to save space.
+
+---
+
+## Files to Modify
+
+| File | Changes |
 |------|---------|
-| `supabase/functions/generate-deal-summary/index.ts` | Edge function to generate summary via Lovable AI |
-| `src/components/deals/DealSummaryGenerator.tsx` | Main dialog component with prompt input and output display |
-| `src/hooks/useDealSummary.ts` | Hook to manage summary generation state and API calls |
-
-### Modified Files
-
-| File | Change |
-|------|--------|
-| `src/pages/DealDetail.tsx` | Add floating summary button and import generator component |
-| `supabase/config.toml` | Register the new edge function |
+| `src/pages/DealDetail.tsx` | Restructure header with mobile-specific stacked layout using `useIsMobile` hook |
+| `src/components/deals/DealToolbar.tsx` | Add option to render toggles as standalone full-width row for mobile |
+| `src/components/deals/ImportContractDialog.tsx` | Hide button text on mobile, show only icon |
 
 ---
 
-## Component: DealSummaryGenerator
+## Technical Approach
 
-### Props
-```typescript
-interface DealSummaryGeneratorProps {
-  deal: Deal;
-  scenarios: Scenario[];
-  lineItemsByScenario: Record<string, LineItem[]>;
-}
-```
+### DealDetail.tsx Changes
 
-### Features
-- **Trigger Button**: Floating action button positioned at bottom-right of the page, styled to match the app's primary color
-- **Dialog/Sheet**: Opens a bottom sheet (mobile) or dialog (desktop) with:
-  - Optional text input for custom prompts/focus areas
-  - Generate button with loading state
-  - Formatted markdown output display
-  - Copy to clipboard button
-  - Regenerate button
-- **Keyboard shortcut**: Consider adding Cmd/Ctrl+G for power users
-
-### UI States
-1. **Idle**: Shows prompt input and generate button
-2. **Generating**: Loading spinner, disabled inputs
-3. **Success**: Rendered summary with copy/regenerate actions
-4. **Error**: Error message with retry option
-
----
-
-## Edge Function: generate-deal-summary
-
-### Endpoint
-`POST /functions/v1/generate-deal-summary`
-
-### Request Body
-```typescript
-{
-  deal_id: string;
-  prompt?: string; // Optional user customization
-}
-```
-
-### Logic Flow
-1. Authenticate user via JWT
-2. Fetch deal, scenarios, and line items from database
-3. Calculate totals for each scenario
-4. Build structured context for AI
-5. Call Lovable AI with formatted prompt
-6. Return generated summary
-
-### AI Prompt Strategy
-The prompt will be designed to produce human-friendly, customer-facing content:
-
-```text
-System: You are creating a deal summary for a sales account executive to share 
-with their customer. Write in clear, professional language that emphasizes 
-value and savings. Format with markdown headers and bullet points for 
-easy reading.
-
-Context:
-- Deal: {deal.name}
-- View: Customer-facing
-- Scenarios: {scenario summaries with products, quantities, pricing}
-- Totals: {list price, net price, discount, term, savings}
-
-User prompt (if provided): {optional customization}
-
-Generate a summary that includes:
-1. Investment Overview - Clear statement of costs
-2. Your Savings - Quantified discount and savings
-3. What's Included - Products and quantities
-4. Value Proposition - Why this deal makes sense
-
-Keep it concise, positive, and focused on customer value.
-```
-
-### Response Format
-```typescript
-{
-  success: boolean;
-  summary?: string; // Markdown formatted
-  error?: string;
-}
-```
-
----
-
-## Hook: useDealSummary
-
-```typescript
-interface UseDealSummaryOptions {
-  dealId: string;
-  onSuccess?: (summary: string) => void;
-  onError?: (error: string) => void;
-}
-
-interface UseDealSummaryReturn {
-  generate: (prompt?: string) => Promise<void>;
-  summary: string | null;
-  isGenerating: boolean;
-  error: string | null;
-  reset: () => void;
-}
-```
-
-### Implementation
-- Uses `fetch` to call the edge function (not supabase.functions.invoke for streaming support in future)
-- Manages loading, error, and success states
-- Stores last generated summary in state
-- Handles 429/402 rate limit errors with user-friendly messages
-
----
-
-## UI Implementation Details
-
-### Floating Action Button
 ```tsx
-<Button
-  onClick={openDialog}
-  className="fixed bottom-6 right-6 h-12 px-5 shadow-lg rounded-full z-50"
->
-  <Sparkles className="h-4 w-4 mr-2" />
-  Generate Summary
+// Import the mobile hook
+import { useIsMobile } from '@/hooks/use-mobile';
+
+// In the header section, use conditional rendering:
+{isMobile ? (
+  // Stacked mobile layout
+  <header className="border-b border-border bg-card shadow-card">
+    {/* Row 1: Navigation */}
+    <div className="flex items-center justify-between px-4 py-2">
+      <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back
+      </Button>
+      <div className="flex items-center gap-2">
+        <ImportContractDialog dealId={dealId!} onImportComplete={handleImportContract} />
+        {/* Overflow menu only */}
+      </div>
+    </div>
+    
+    {/* Row 2: Deal Name */}
+    <div className="flex items-center gap-2 px-4 py-2 border-t border-border/50">
+      <Input value={dealName} onChange={...} className="flex-1 text-lg font-semibold" />
+      <SaveStatusIndicator status={status} onRetry={retry} />
+    </div>
+    
+    {/* Row 3: Toggles */}
+    <div className="flex items-center justify-between px-4 py-2 border-t border-border/50">
+      <DisplayModeToggle ... />
+      <ViewModeToggle ... />
+    </div>
+  </header>
+) : (
+  // Existing desktop layout
+  <header>...</header>
+)}
+```
+
+### DealToolbar.tsx Changes
+
+Create a simplified mobile variant that only shows the overflow menu (since toggles are now rendered separately in the header):
+
+```tsx
+if (isMobile) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-9 w-9">
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        {/* Existing Volume toggle */}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+```
+
+### ImportContractDialog.tsx Changes
+
+Make the trigger button responsive:
+
+```tsx
+<Button variant="outline" size="sm" className="min-h-[44px]">
+  <FileImage className="h-4 w-4" />
+  <span className="hidden sm:inline ml-2">Import Contract</span>
 </Button>
 ```
 
-### Summary Output Styling
-- Use prose-like formatting for readability
-- Left-aligned text, generous line height
-- Clear section headers
-- Bullet points for line items
-- Highlighted savings figures (bold or accent color)
+---
 
-### Copy to Clipboard
-```typescript
-const handleCopy = async () => {
-  await navigator.clipboard.writeText(summary);
-  toast({ title: "Copied to clipboard" });
-};
-```
+## Additional Refinements
+
+1. **Floating Action Button**: Move it slightly higher on mobile to avoid conflict with browser navigation bars (`bottom-20` instead of `bottom-6` on mobile)
+
+2. **Touch targets**: Ensure all interactive elements maintain the 44px minimum touch target size
+
+3. **Horizontal scrolling prevention**: Add `overflow-x-hidden` to the header container to prevent any accidental horizontal scroll
 
 ---
 
-## Data Preparation for AI
+## Summary of Changes
 
-The edge function will prepare a structured summary of deal data:
+| Component | Current Issue | Fix |
+|-----------|---------------|-----|
+| DealDetail header | Single crowded row | Split into 3 rows on mobile |
+| Deal name input | Hidden/squeezed | Dedicated full-width row |
+| Toggles | Cramped inline | Full-width row at bottom of header |
+| Import button | Text takes space | Icon-only on mobile |
+| Overflow menu | Works | Keep as-is |
+| FAB | May overlap navigation | Adjust position on mobile |
 
-```typescript
-interface DealContext {
-  dealName: string;
-  scenarios: Array<{
-    name: string;
-    products: Array<{
-      name: string;
-      quantity: number;
-      netMonthly: number;
-      netAnnual: number;
-      discountPercent: number;
-    }>;
-    totals: {
-      listAnnual: number;
-      netAnnual: number;
-      netTerm: number;
-      blendedDiscount: number;
-      annualSavings: number;
-      termSavings: number;
-    };
-  }>;
-}
-```
-
----
-
-## Considerations
-
-### Rate Limiting
-- Display friendly error if user hits rate limits
-- Consider debouncing the generate button
-
-### Content Safety
-- AI output is for internal sales use, so content filtering is minimal
-- Summary is ephemeral (not saved to database)
-
-### Future Enhancements
-- Save favorite summaries
-- Export summary as PDF
-- Streaming response for real-time rendering
-- Multiple summary styles (executive brief, detailed breakdown)
-
----
-
-## File Summary
-
-| File | Action | Purpose |
-|------|--------|---------|
-| `supabase/functions/generate-deal-summary/index.ts` | Create | AI summary generation endpoint |
-| `src/components/deals/DealSummaryGenerator.tsx` | Create | UI component for summary generation |
-| `src/hooks/useDealSummary.ts` | Create | State management hook |
-| `src/pages/DealDetail.tsx` | Modify | Add floating button and integrate generator |
-| `supabase/config.toml` | Modify | Register new edge function |
-
----
-
-## Technical Notes
-
-### Why Edge Function?
-- Keeps AI prompts and logic server-side
-- Protects API key and rate limiting logic
-- Allows fetching deal data with elevated permissions if needed
-- Can be enhanced with streaming in future
-
-### Security
-- Uses existing JWT authentication
-- Only fetches deals belonging to the authenticated user (existing RLS)
-- No data persistence - summary is generated on-demand
-
-### Model Selection
-- Uses `google/gemini-2.5-flash` for fast, cost-effective generation
-- Suitable for the structured summarization task
+This restructuring follows mobile-first principles and matches the existing design system while dramatically improving usability on phones.
