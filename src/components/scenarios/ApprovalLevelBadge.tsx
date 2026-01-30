@@ -51,7 +51,7 @@ export function ApprovalLevelBadge({
       return `Approval Level ${approvalResult.level} • Max L4: ${maxL4Percent}`;
     }
 
-    return `Requires escalation (>${maxL4Percent}) • Max L4: ${maxL4Percent}`;
+    return `Requires escalation (>${maxL4Percent})`;
   }, [approvalResult]);
 
   // Determine if Max L4 button should be shown and if it's already at max
