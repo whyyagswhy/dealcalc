@@ -20,7 +20,7 @@ import { useAutosave } from '@/hooks/useAutosave';
 import { useCloneLineItem } from '@/hooks/useLineItems';
 import { ExistingVolumeFields } from './ExistingVolumeFields';
 import { DisplayModeToggle } from './DisplayModeToggle';
-import { ProductCombobox } from './ProductCombobox';
+import { HierarchicalProductPicker } from './HierarchicalProductPicker';
 import { ApprovalLevelBadge } from './ApprovalLevelBadge';
 import { cn } from '@/lib/utils';
 import type { LineItem, Scenario, RevenueType, DisplayMode } from '@/lib/types';
@@ -242,9 +242,9 @@ export function LineItemRow({
     )}>
       {/* Row 1: Product Name + Display Toggle */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <Label className="text-xs text-muted-foreground">Product</Label>
-          <ProductCombobox
+          <HierarchicalProductPicker
             value={productName}
             onChange={setProductName}
             onPriceSelect={(monthlyPrice) => {
@@ -257,11 +257,10 @@ export function LineItemRow({
                 setNetUnitPrice(net.toFixed(2));
               }
             }}
-            placeholder="Search or select product..."
           />
         </div>
         {viewMode === 'internal' && (
-          <div className="pt-6">
+          <div className="pt-6 shrink-0">
             <DisplayModeToggle
               value={displayOverride}
               onChange={setDisplayOverride}
