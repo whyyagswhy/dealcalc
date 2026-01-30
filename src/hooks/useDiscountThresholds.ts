@@ -57,6 +57,14 @@ export function extractCategory(productName: string): string {
   return 'Other';
 }
 
+// Custom error class for access denied
+export class AccessDeniedError extends Error {
+  constructor(message: string = 'You do not have access to pricing data') {
+    super(message);
+    this.name = 'AccessDeniedError';
+  }
+}
+
 // Fetch unique product names from discount_thresholds
 export function useDiscountMatrixProducts() {
   return useQuery({
@@ -69,6 +77,10 @@ export function useDiscountMatrixProducts() {
         .order('product_name');
 
       if (error) {
+        // Check if this is a permission/RLS error
+        if (error.code === 'PGRST301' || error.message?.includes('permission') || error.code === '42501') {
+          throw new AccessDeniedError();
+        }
         if (import.meta.env.DEV) {
           console.error('Error fetching discount matrix products:', error);
         }
@@ -91,6 +103,11 @@ export function useDiscountMatrixProducts() {
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes cache
+    retry: (failureCount, error) => {
+      // Don't retry on access denied errors
+      if (error instanceof AccessDeniedError) return false;
+      return failureCount < 3;
+    },
   });
 }
 
@@ -106,6 +123,10 @@ export function useDiscountThresholds() {
         .order('qty_min');
 
       if (error) {
+        // Check if this is a permission/RLS error
+        if (error.code === 'PGRST301' || error.message?.includes('permission') || error.code === '42501') {
+          throw new AccessDeniedError();
+        }
         if (import.meta.env.DEV) {
           console.error('Error fetching discount thresholds:', error);
         }
@@ -116,6 +137,11 @@ export function useDiscountThresholds() {
     },
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    retry: (failureCount, error) => {
+      // Don't retry on access denied errors
+      if (error instanceof AccessDeniedError) return false;
+      return failureCount < 3;
+    },
   });
 }
 

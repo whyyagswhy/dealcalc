@@ -4,6 +4,7 @@ import { useDeal, useUpdateDeal } from '@/hooks/useDeal';
 import { useScenarios, useCreateScenario, useUpdateScenario, useDeleteScenario, useCloneScenario } from '@/hooks/useScenarios';
 import { useCreateLineItem } from '@/hooks/useLineItems';
 import { useAutosave } from '@/hooks/useAutosave';
+import { useSalesAccess } from '@/hooks/useSalesAccess';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SaveStatusIndicator } from '@/components/deals/SaveStatusIndicator';
@@ -11,6 +12,7 @@ import { DealToolbar } from '@/components/deals/DealToolbar';
 import { ImportContractDialog } from '@/components/deals/ImportContractDialog';
 import { ScenarioCard } from '@/components/scenarios/ScenarioCard';
 import { ScenarioComparison } from '@/components/scenarios/ScenarioComparison';
+import { AccessDenied } from '@/components/AccessDenied';
 import { ArrowLeft, Plus, Loader2 } from 'lucide-react';
 import type { Deal } from '@/lib/types';
 import {
@@ -29,6 +31,7 @@ export default function DealDetail() {
   const navigate = useNavigate();
   const { data: deal, isLoading, isError } = useDeal(dealId);
   const { data: scenarios = [], isLoading: scenariosLoading } = useScenarios(dealId);
+  const { data: hasSalesAccess, isLoading: accessLoading } = useSalesAccess();
   const updateDeal = useUpdateDeal();
   const createScenario = useCreateScenario();
   const updateScenario = useUpdateScenario();
@@ -138,10 +141,31 @@ export default function DealDetail() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || accessLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!hasSalesAccess) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border bg-card shadow-card">
+          <div className="mx-auto flex h-16 sm:h-20 max-w-[1400px] items-center px-4 sm:px-6 lg:px-8">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/')}
+              className="shrink-0 min-h-[44px] min-w-[44px]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="ml-2 hidden sm:inline">Back</span>
+            </Button>
+          </div>
+        </header>
+        <AccessDenied showBackButton={false} />
       </div>
     );
   }

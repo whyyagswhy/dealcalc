@@ -1,6 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+// Custom error class for access denied
+export class AccessDeniedError extends Error {
+  constructor(message: string = 'You do not have access to pricing data') {
+    super(message);
+    this.name = 'AccessDeniedError';
+  }
+}
+
 export interface PriceBookProduct {
   id: string;
   product_name: string;
@@ -26,6 +34,10 @@ export function usePriceBook() {
         .order('edition');
 
       if (error) {
+        // Check if this is a permission/RLS error
+        if (error.code === 'PGRST301' || error.message?.includes('permission') || error.code === '42501') {
+          throw new AccessDeniedError();
+        }
         if (import.meta.env.DEV) {
           console.error('Error fetching price book:', error);
         }
@@ -36,6 +48,11 @@ export function usePriceBook() {
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes cache
+    retry: (failureCount, error) => {
+      // Don't retry on access denied errors
+      if (error instanceof AccessDeniedError) return false;
+      return failureCount < 3;
+    },
   });
 }
 
