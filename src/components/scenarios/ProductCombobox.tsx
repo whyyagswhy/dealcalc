@@ -15,8 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { usePriceBookProducts } from '@/hooks/usePriceBookProducts';
-import { groupProductsByCategory, formatPrice, type PriceBookProduct } from '@/lib/priceBookTypes';
+import { useDiscountMatrixProducts, groupDiscountProductsByCategory, type DiscountMatrixProduct } from '@/hooks/useDiscountThresholds';
 
 interface ProductComboboxProps {
   value: string;
@@ -39,7 +38,7 @@ export function ProductCombobox({
   const [searchQuery, setSearchQuery] = useState('');
   const buttonRef = useRef<HTMLButtonElement>(null);
   
-  const { data: products, isLoading, error } = usePriceBookProducts();
+  const { data: products, isLoading, error } = useDiscountMatrixProducts();
 
   // Filter products based on search query
   const filteredProducts = useMemo(() => {
@@ -49,14 +48,13 @@ export function ProductCombobox({
     const query = searchQuery.toLowerCase().trim();
     return products.filter(product =>
       product.product_name.toLowerCase().includes(query) ||
-      product.category.toLowerCase().includes(query) ||
-      (product.edition && product.edition.toLowerCase().includes(query))
+      product.category.toLowerCase().includes(query)
     );
   }, [products, searchQuery]);
 
   // Group filtered products by category
   const groupedProducts = useMemo(() => 
-    groupProductsByCategory(filteredProducts),
+    groupDiscountProductsByCategory(filteredProducts),
     [filteredProducts]
   );
 
@@ -69,14 +67,12 @@ export function ProductCombobox({
   }, [products, searchQuery]);
 
   // Handle product selection
-  const handleSelect = useCallback((product: PriceBookProduct) => {
+  const handleSelect = useCallback((product: DiscountMatrixProduct) => {
     onChange(product.product_name);
-    if (onPriceSelect) {
-      onPriceSelect(product.monthly_list_price);
-    }
+    // Note: discount matrix doesn't include prices, so we don't call onPriceSelect
     setOpen(false);
     setSearchQuery('');
-  }, [onChange, onPriceSelect]);
+  }, [onChange]);
 
   // Handle custom product entry
   const handleCustomSelect = useCallback(() => {
@@ -91,12 +87,6 @@ export function ProductCombobox({
       setSearchQuery('');
     }
   }, [open]);
-
-  // Find if current value matches a product
-  const selectedProduct = useMemo(() => 
-    products?.find(p => p.product_name === value),
-    [products, value]
-  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -120,7 +110,7 @@ export function ProductCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-[400px] p-0" 
+        className="w-[450px] p-0" 
         align="start"
         sideOffset={4}
       >
@@ -171,23 +161,18 @@ export function ProductCombobox({
               <CommandGroup key={group.category} heading={group.category}>
                 {group.products.map((product) => (
                   <CommandItem
-                    key={product.id}
+                    key={product.product_name}
                     value={product.product_name}
                     onSelect={() => handleSelect(product)}
                     className="cursor-pointer"
                   >
                     <Check
                       className={cn(
-                        "mr-2 h-4 w-4",
+                        "mr-2 h-4 w-4 shrink-0",
                         value === product.product_name ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    <div className="flex flex-1 items-center justify-between gap-2">
-                      <span className="truncate">{product.product_name}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatPrice(product.annual_list_price, product.pricing_unit)}
-                      </span>
-                    </div>
+                    <span className="truncate">{product.product_name}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>
