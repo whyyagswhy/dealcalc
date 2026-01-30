@@ -50,6 +50,45 @@ export type Database = {
         }
         Relationships: []
       }
+      discount_thresholds: {
+        Row: {
+          created_at: string | null
+          id: string
+          level_0_max: number | null
+          level_1_max: number | null
+          level_2_max: number | null
+          level_3_max: number | null
+          level_4_max: number | null
+          product_name: string
+          qty_max: number
+          qty_min: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          level_0_max?: number | null
+          level_1_max?: number | null
+          level_2_max?: number | null
+          level_3_max?: number | null
+          level_4_max?: number | null
+          product_name: string
+          qty_max?: number
+          qty_min?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          level_0_max?: number | null
+          level_1_max?: number | null
+          level_2_max?: number | null
+          level_3_max?: number | null
+          level_4_max?: number | null
+          product_name?: string
+          qty_max?: number
+          qty_min?: number
+        }
+        Relationships: []
+      }
       line_items: {
         Row: {
           created_at: string
