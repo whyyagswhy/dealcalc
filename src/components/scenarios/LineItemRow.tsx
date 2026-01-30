@@ -21,6 +21,7 @@ import { useCloneLineItem } from '@/hooks/useLineItems';
 import { ExistingVolumeFields } from './ExistingVolumeFields';
 import { DisplayModeToggle } from './DisplayModeToggle';
 import { ProductCombobox } from './ProductCombobox';
+import { ApprovalLevelBadge } from './ApprovalLevelBadge';
 import { cn } from '@/lib/utils';
 import type { LineItem, Scenario, RevenueType, DisplayMode } from '@/lib/types';
 
@@ -301,7 +302,16 @@ export function LineItemRow({
       {/* Row 3: Discount / Net Price - both fully editable */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <div>
-          <Label className="text-xs text-muted-foreground">Discount %</Label>
+          <div className="flex items-center justify-between mb-1">
+            <Label className="text-xs text-muted-foreground">Discount %</Label>
+            {viewMode === 'internal' && (
+              <ApprovalLevelBadge
+                productName={productName}
+                quantity={parseIntSafe(quantity) ?? 0}
+                discountPercent={discountPercent ? (parseFloatSafe(discountPercent) ?? 0) / 100 : null}
+              />
+            )}
+          </div>
           <Input
             type="number"
             value={discountPercent}
