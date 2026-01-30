@@ -59,43 +59,36 @@ export function ScenarioSummary({
   return (
     <div 
       className={cn(
-        "sticky top-0 z-10 rounded-lg p-3 sm:p-4 lg:p-5",
+        "sticky top-0 z-10 rounded-lg p-4 sm:p-5",
         "bg-gradient-to-r from-[hsl(var(--grad-start))] to-[hsl(var(--grad-end))]",
         className
       )}
     >
-      {/* Responsive grid */}
-      <div className={cn(
-        "grid gap-x-2 gap-y-2 sm:gap-x-3 sm:gap-y-2",
-        itemCount <= 5 ? "grid-cols-2 sm:grid-cols-3" : 
-        itemCount <= 6 ? "grid-cols-2 sm:grid-cols-3" :
-        "grid-cols-2 sm:grid-cols-4"
-      )}>
+      {/* Two-row layout for better readability */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
         <KpiBlock label={`List${periodLabel}`} value={formatCurrency(displayList)} />
         <KpiBlock label={`Net${periodLabel}`} value={formatCurrency(displayNet)} />
-        <KpiBlock label="Discounted Price" value={formatCurrency(totals.netTerm)} />
-        <KpiBlock label="Annual Savings" value={formatCurrency(totals.listAnnual - totals.netAnnual)} />
-        {showTermSavings && (
-          <KpiBlock label="Term Savings" value={formatCurrency(totals.totalSavings)} />
-        )}
         <KpiBlock label="Discount" value={formatPercent(totals.blendedDiscount)} />
-        
-        {isInternal && (
-          <>
-            <KpiBlock label="Comm. ACV" value={formatCurrency(totals.totalCommissionableACV)} />
-            <KpiBlock label="Total ACV" value={formatCurrency(totals.totalACV)} />
-          </>
-        )}
+        <KpiBlock label="Term Total" value={formatCurrency(totals.netTerm)} />
       </div>
+      
+      {isInternal && (
+        <div className="grid grid-cols-2 gap-4 sm:gap-6 mt-3 pt-3 border-t border-white/20">
+          <KpiBlock label="Comm. ACV" value={formatCurrency(totals.totalCommissionableACV)} />
+          <KpiBlock label="Total ACV" value={formatCurrency(totals.totalACV)} />
+        </div>
+      )}
     </div>
   );
 }
 
 function KpiBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col items-center text-center min-w-0 overflow-hidden">
-      <span className="text-[10px] sm:text-xs font-semibold text-white/75 uppercase tracking-wide truncate w-full">{label}</span>
-      <span className="text-base sm:text-lg md:text-xl font-extrabold text-white tabular-nums truncate w-full">
+    <div className="flex flex-col items-center text-center">
+      <span className="text-[10px] sm:text-xs font-semibold text-white/80 uppercase tracking-wider whitespace-nowrap">
+        {label}
+      </span>
+      <span className="text-lg sm:text-xl lg:text-2xl font-bold text-white tabular-nums whitespace-nowrap">
         {value}
       </span>
     </div>
