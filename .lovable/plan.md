@@ -1,114 +1,161 @@
 
-# Plan: Intuitive Hierarchical Product Picker with Price Auto-Fill
+# Plan: Improve KPI Banner UI and Conditional Display Logic
 
 ## Summary
-Replace the current flat product combobox with a two-step hierarchical picker: first select a **Category** (e.g., "Sales Cloud"), then select an **Edition** (e.g., "Enterprise" or "Unlimited"). This matches how Salesforce products are actually structured and automatically populates the list price from the price book.
-
-## Problems Identified
-
-1. **Naming Mismatch**: The discount matrix has products like `[Unlimited] Sales Cloud` while the price book has `Sales Cloud - Unlimited Edition`. The lookup fails because these names don't match.
-
-2. **Flat List UX**: The current dropdown shows ~1,900 products in a single flat list, making it hard to find what you need.
-
-3. **No Price Auto-Fill**: Due to the naming mismatch, the price lookup returns `undefined` and list price doesn't populate.
-
-## Solution Architecture
-
-```text
-+--------------------+     +--------------------+
-|  Category Select   | --> |   Edition Select   | --> Auto-fill List Price
-|  "Sales Cloud"     |     |  "Enterprise"      |     + Set product_name
-+--------------------+     +--------------------+
-         |                          |
-         v                          v
-  price_book_products        Constructs final name:
-  (distinct categories)      "[Enterprise] Sales Cloud"
-                             for discount matrix lookup
-```
-
-## Implementation Steps
-
-### Step 1: Create New Hierarchical Product Picker Component
-Create `src/components/scenarios/HierarchicalProductPicker.tsx`:
-
-- **Category dropdown**: Lists distinct categories from `price_book_products` (Sales Cloud, Service Cloud, etc.)
-- **Edition dropdown**: Shows available editions for the selected category (Enterprise, Unlimited, Professional, etc.)
-- When both are selected:
-  - Look up price from `price_book_products` using category + edition
-  - Construct the discount matrix product name: `[{edition}] {category}` (e.g., `[Enterprise] Sales Cloud`)
-  - Return both values to parent: product name for discount lookup, price for auto-fill
-
-### Step 2: Create Product Mapping Utilities
-Add `src/lib/productMapping.ts`:
-
-- `buildDiscountMatrixName(category, edition)`: Constructs `[Enterprise] Sales Cloud` format
-- `parseDiscountMatrixName(productName)`: Extracts category and edition from `[Enterprise] Sales Cloud`
-- `findPriceBookMatch(priceBook, category, edition)`: Finds matching price book entry
-
-### Step 3: Update Price Book Hook
-Modify `src/hooks/usePriceBook.ts`:
-
-- Add new query for distinct categories with their editions
-- Create lookup by category + edition instead of just product name
-
-### Step 4: Update LineItemRow Integration
-Modify `src/components/scenarios/LineItemRow.tsx`:
-
-- Replace `ProductCombobox` with new `HierarchicalProductPicker`
-- Handle both outputs: `product_name` for saving + discount matrix, `listPrice` for auto-fill
-- Support editing existing line items by parsing the stored product name
-
-### Step 5: Keep Existing Combobox as Fallback
-- Keep "Custom product" option for products not in the standard list
-- Add a "More products..." option that opens the full searchable list
-
-## UI Design
-
-```text
-Row 1 (new layout):
-+------------------+  +------------------+  +-----------+
-|  Category   ▾    |  |  Edition    ▾    |  | [Mo/An]   |
-|  Sales Cloud     |  |  Enterprise      |  |  toggle   |
-+------------------+  +------------------+  +-----------+
-
-Row 2 (unchanged):
-+-------------+  +-------+  +-----------+
-| List Price  |  |  Qty  |  | Term (mo) |
-|  $175.00    |  |  25   |  |    12     |
-+-------------+  +-------+  +-----------+
-```
-
-## Data Flow
-
-1. User selects **Category**: "Sales Cloud"
-2. User selects **Edition**: "Enterprise"
-3. System looks up `price_book_products` where category="Sales Cloud" AND edition="Enterprise"
-4. System auto-fills List Price: `$175/mo`
-5. System sets `product_name` to `[Enterprise] Sales Cloud` for discount matrix compatibility
-
-## Edge Cases
-
-- **Products without editions**: Some add-ons have no edition (e.g., "Pardot"). Show edition dropdown as "N/A" or hide it.
-- **Custom products**: Keep the "Custom product" option for items not in the price book.
-- **Existing line items**: Parse stored `product_name` to pre-select category and edition.
+Refactor the ScenarioSummary KPI banner to fix visual issues, conditionally show Incremental ACV only when existing volume data exists, rename "Comm. ACV" to "Incremental ACV", and add annual/term costs plus savings to the customer-facing view.
 
 ---
 
-## Technical Details
+## Changes Overview
 
-### Files to Create
-- `src/components/scenarios/HierarchicalProductPicker.tsx` - New two-step picker component
-- `src/lib/productMapping.ts` - Name parsing and construction utilities
+### 1. Fix Visual Issues in KPI Banner
+**Problem**: Values are truncated/overlapping when numbers get large (e.g., "$262,500" barely fits)
 
-### Files to Modify
-- `src/hooks/usePriceBook.ts` - Add category/edition grouping query
-- `src/components/scenarios/LineItemRow.tsx` - Integrate new picker
+**Solution**:
+- Reduce font sizes slightly for better fit
+- Add responsive text sizing that scales down on narrower cards
+- Improve spacing and ensure `whitespace-nowrap` prevents mid-word breaks
+- Use 3-column grid for primary row on small screens to prevent crowding
 
-### Database
-No database changes needed. Both tables already have the required data structure.
+### 2. Rename "Comm. ACV" → "Incremental ACV"
+**Location**: `ScenarioSummary.tsx` line 77
 
-### Testing Criteria
-1. Select "Sales Cloud" > "Enterprise" - List price should auto-fill to $175
-2. Discount badge should show approval levels correctly (product name matches discount matrix)
-3. Max L4 button should apply the correct maximum discount
-4. Existing line items with `[Enterprise] Sales Cloud` should show correct category/edition selected
+**Change**:
+```text
+Before: "Comm. ACV"
+After:  "Incr. ACV"
+```
+
+### 3. Conditionally Show Incremental ACV
+**Logic**: Only display the Incremental ACV row if any line item has existing volume data entered (`totalExistingAnnual > 0`)
+
+**Current behavior**: Always shows both "Comm. ACV" and "Total ACV" in internal view
+**New behavior**: 
+- If no existing volume data: Show only "Total ACV" (since Incremental = Total in this case)
+- If existing volume data exists: Show both "Incr. ACV" and "Total ACV"
+
+### 4. Customer View: Add Annual, Term, and Savings KPIs
+**Current customer view shows**: List/mo, Net/mo, Discount, Term Total (4 items)
+
+**New customer view will show** (2 rows):
+- **Row 1**: Annual Cost, Term Cost, Discount
+- **Row 2**: Annual Savings, Term Savings
+
+This gives customers clear visibility into their actual costs and savings without internal metrics.
+
+---
+
+## Technical Implementation
+
+### File: `src/components/scenarios/ScenarioSummary.tsx`
+
+#### Props Enhancement
+Add `enableExistingVolume` prop to know whether to check for baseline data:
+
+```typescript
+interface ScenarioSummaryProps {
+  lineItems: LineItem[];
+  displayMode: DisplayMode;
+  viewMode: ViewMode;
+  className?: string;
+}
+```
+
+#### Internal View Logic
+```typescript
+// Only show Incremental ACV if there's actual existing volume data
+const hasExistingVolumeData = totals.totalExistingAnnual > 0;
+
+{isInternal && hasExistingVolumeData && (
+  <div className="grid grid-cols-2 gap-4">
+    <KpiBlock label="Incr. ACV" value={formatCurrency(totals.totalCommissionableACV)} />
+    <KpiBlock label="Total ACV" value={formatCurrency(totals.totalACV)} />
+  </div>
+)}
+
+{isInternal && !hasExistingVolumeData && (
+  <div className="flex justify-center">
+    <KpiBlock label="Total ACV" value={formatCurrency(totals.totalACV)} />
+  </div>
+)}
+```
+
+#### Customer View Layout
+```typescript
+{!isInternal && (
+  <>
+    {/* Row 1: Costs */}
+    <div className="grid grid-cols-3 gap-4">
+      <KpiBlock label="Annual" value={formatCurrency(totals.netAnnual)} />
+      <KpiBlock label="Term Cost" value={formatCurrency(totals.netTerm)} />
+      <KpiBlock label="Discount" value={formatPercent(totals.blendedDiscount)} />
+    </div>
+    
+    {/* Row 2: Savings */}
+    <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-white/20">
+      <KpiBlock label="Annual Savings" value={formatCurrency(annualSavings)} />
+      <KpiBlock label="Term Savings" value={formatCurrency(totals.totalSavings)} />
+    </div>
+  </>
+)}
+```
+
+#### Calculations to Add
+```typescript
+// Calculate annual savings (list - net annual)
+const annualSavings = totals.listAnnual - totals.netAnnual;
+```
+
+#### Visual Improvements to KpiBlock
+```typescript
+function KpiBlock({ label, value, size = 'normal' }: { 
+  label: string; 
+  value: string; 
+  size?: 'normal' | 'compact';
+}) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <span className={cn(
+        "font-semibold text-white/80 uppercase tracking-wider whitespace-nowrap",
+        size === 'compact' ? "text-[9px]" : "text-[10px] sm:text-xs"
+      )}>
+        {label}
+      </span>
+      <span className={cn(
+        "font-bold text-white tabular-nums whitespace-nowrap",
+        size === 'compact' ? "text-base sm:text-lg" : "text-lg sm:text-xl"
+      )}>
+        {value}
+      </span>
+    </div>
+  );
+}
+```
+
+---
+
+## KPI Display Summary
+
+| View | Row 1 | Row 2 |
+|------|-------|-------|
+| **Internal (no existing volume)** | List, Net, Discount, Term Total | Total ACV (centered) |
+| **Internal (with existing volume)** | List, Net, Discount, Term Total | Incr. ACV, Total ACV |
+| **Customer** | Annual, Term Cost, Discount | Annual Savings, Term Savings |
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/scenarios/ScenarioSummary.tsx` | Main refactor: conditional Incremental ACV, customer view savings, visual fixes |
+
+---
+
+## Testing Criteria
+
+1. **Internal view without existing volume**: Shows List/mo, Net/mo, Discount, Term Total on row 1, centered "Total ACV" on row 2
+2. **Internal view with existing volume entered on an Add-on line**: Shows both "Incr. ACV" and "Total ACV" on row 2
+3. **Customer view**: Shows Annual, Term Cost, Discount on row 1; Annual Savings, Term Savings on row 2
+4. **Large values don't truncate**: $262,500 and similar values display fully without ellipsis
+5. **Responsive**: Layout adjusts cleanly on mobile without overlapping
