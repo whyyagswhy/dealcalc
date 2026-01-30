@@ -22,7 +22,8 @@ export function usePriceBook() {
       const { data, error } = await supabase
         .from('price_book_products')
         .select('id, product_name, category, edition, pricing_unit, annual_list_price, monthly_list_price')
-        .order('product_name');
+        .order('category')
+        .order('edition');
 
       if (error) {
         if (import.meta.env.DEV) {
