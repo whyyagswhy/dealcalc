@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { DealListItem } from '@/lib/types';
 
@@ -47,6 +47,20 @@ export function useDeals({ searchQuery = '' }: UseDealsOptions = {}) {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: 0,
     staleTime: 30000, // 30 seconds
+  });
+}
+
+export function useDeleteDeal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (dealId: string) => {
+      const { error } = await supabase.from('deals').delete().eq('id', dealId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deals'] });
+    },
   });
 }
 

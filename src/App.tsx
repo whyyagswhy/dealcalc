@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/admin/AdminRoute";
 import { useDiscountMatrixSeeder } from "@/hooks/useDiscountMatrixSeeder";
 
 // Lazy load route components for code splitting
@@ -13,6 +14,8 @@ const Auth = lazy(() => import("@/pages/Auth"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const Deals = lazy(() => import("@/pages/Deals"));
 const DealDetail = lazy(() => import("@/pages/DealDetail"));
+const Admin = lazy(() => import("@/pages/Admin"));
+const AdminUserDetail = lazy(() => import("@/pages/AdminUserDetail"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -55,6 +58,26 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <DealDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute>
+                    <AdminRoute>
+                      <Admin />
+                    </AdminRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users/:userId"
+                element={
+                  <ProtectedRoute>
+                    <AdminRoute>
+                      <AdminUserDetail />
+                    </AdminRoute>
                   </ProtectedRoute>
                 }
               />
