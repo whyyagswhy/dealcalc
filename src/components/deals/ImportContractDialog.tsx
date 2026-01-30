@@ -260,8 +260,8 @@ export function ImportContractDialog({ dealId, onImportComplete }: ImportContrac
     <Dialog open={open} onOpenChange={(isOpen) => isOpen ? setOpen(true) : handleClose()}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="min-h-[44px]">
-          <FileImage className="mr-2 h-4 w-4" />
-          Import Contract
+          <FileImage className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Import Contract</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">

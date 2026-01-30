@@ -71,11 +71,11 @@ export function DealSummaryGenerator({ dealId, dealName, hasScenarios }: DealSum
 
   return (
     <>
-      {/* Floating Action Button */}
+      {/* Floating Action Button - positioned higher on mobile to avoid browser nav bars */}
       <Button
         onClick={() => setIsOpen(true)}
         disabled={!hasScenarios}
-        className="fixed bottom-6 right-6 h-12 px-5 shadow-lg rounded-full z-50 gap-2"
+        className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 h-12 px-5 shadow-lg rounded-full z-50 gap-2"
         title={hasScenarios ? 'Generate AI Summary' : 'Add scenarios first'}
       >
         <Sparkles className="h-4 w-4" />
