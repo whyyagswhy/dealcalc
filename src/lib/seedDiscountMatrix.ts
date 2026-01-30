@@ -45,7 +45,9 @@ export async function seedDiscountMatrix(): Promise<{ success: boolean; message:
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error seeding discount matrix:', error);
+    if (import.meta.env.DEV) {
+      console.error('Error seeding discount matrix:', error);
+    }
     return { success: false, message };
   }
 }

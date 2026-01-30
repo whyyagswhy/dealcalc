@@ -69,7 +69,9 @@ export function useDiscountMatrixProducts() {
         .order('product_name');
 
       if (error) {
-        console.error('Error fetching discount matrix products:', error);
+        if (import.meta.env.DEV) {
+          console.error('Error fetching discount matrix products:', error);
+        }
         throw error;
       }
 
@@ -104,7 +106,9 @@ export function useDiscountThresholds() {
         .order('qty_min');
 
       if (error) {
-        console.error('Error fetching discount thresholds:', error);
+        if (import.meta.env.DEV) {
+          console.error('Error fetching discount thresholds:', error);
+        }
         throw error;
       }
 
