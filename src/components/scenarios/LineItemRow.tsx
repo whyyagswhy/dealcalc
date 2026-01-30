@@ -20,6 +20,7 @@ import { useAutosave } from '@/hooks/useAutosave';
 import { useCloneLineItem } from '@/hooks/useLineItems';
 import { ExistingVolumeFields } from './ExistingVolumeFields';
 import { DisplayModeToggle } from './DisplayModeToggle';
+import { ProductCombobox } from './ProductCombobox';
 import { cn } from '@/lib/utils';
 import type { LineItem, Scenario, RevenueType, DisplayMode } from '@/lib/types';
 
@@ -229,11 +230,20 @@ export function LineItemRow({
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <Label className="text-xs text-muted-foreground">Product</Label>
-          <Input
+          <ProductCombobox
             value={productName}
-            onChange={(e) => setProductName(e.target.value)}
-            placeholder="e.g., Sales Cloud"
-            className="h-10"
+            onChange={setProductName}
+            onPriceSelect={(monthlyPrice) => {
+              // Auto-fill list price when a price book product is selected
+              setListUnitPrice(monthlyPrice.toFixed(2));
+              // Recalculate net price if there's a discount
+              const discount = parseFloatSafe(discountPercent);
+              if (discount !== null && discount >= 0 && discount <= 100) {
+                const net = monthlyPrice * (1 - discount / 100);
+                setNetUnitPrice(net.toFixed(2));
+              }
+            }}
+            placeholder="Search or select product..."
           />
         </div>
         {viewMode === 'internal' && (

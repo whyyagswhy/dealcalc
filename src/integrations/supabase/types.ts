@@ -115,6 +115,42 @@ export type Database = {
           },
         ]
       }
+      price_book_products: {
+        Row: {
+          annual_list_price: number
+          category: string
+          created_at: string
+          edition: string | null
+          id: string
+          monthly_list_price: number | null
+          pricing_unit: string
+          product_name: string
+          updated_at: string
+        }
+        Insert: {
+          annual_list_price: number
+          category: string
+          created_at?: string
+          edition?: string | null
+          id?: string
+          monthly_list_price?: number | null
+          pricing_unit?: string
+          product_name: string
+          updated_at?: string
+        }
+        Update: {
+          annual_list_price?: number
+          category?: string
+          created_at?: string
+          edition?: string | null
+          id?: string
+          monthly_list_price?: number | null
+          pricing_unit?: string
+          product_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       scenarios: {
         Row: {
           compare_enabled: boolean
