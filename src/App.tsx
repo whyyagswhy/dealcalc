@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/admin/AdminRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useDiscountMatrixSeeder } from "@/hooks/useDiscountMatrixSeeder";
 
 // Lazy load route components for code splitting
@@ -36,56 +37,60 @@ function DiscountMatrixSeeder() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <DiscountMatrixSeeder />
-      <BrowserRouter>
-        <AuthProvider>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/auth/reset-password" element={<ResetPassword />} />
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Deals />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/deals/:dealId"
-                element={
-                  <ProtectedRoute>
-                    <DealDetail />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute>
-                    <AdminRoute>
-                      <Admin />
-                    </AdminRoute>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/users/:userId"
-                element={
-                  <ProtectedRoute>
-                    <AdminRoute>
-                      <AdminUserDetail />
-                    </AdminRoute>
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </AuthProvider>
-      </BrowserRouter>
+      <ErrorBoundary>
+        <Toaster />
+        <Sonner />
+        <DiscountMatrixSeeder />
+        <BrowserRouter>
+          <AuthProvider>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/auth/reset-password" element={<ResetPassword />} />
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                      <Deals />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/deals/:dealId"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary>
+                        <DealDetail />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute>
+                      <AdminRoute>
+                        <Admin />
+                      </AdminRoute>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users/:userId"
+                  element={
+                    <ProtectedRoute>
+                      <AdminRoute>
+                        <AdminUserDetail />
+                      </AdminRoute>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </AuthProvider>
+        </BrowserRouter>
+      </ErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
 );

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { QUERY_STALE_TIME } from '@/lib/constants';
 
 export interface AdminUser {
   id: string;
@@ -27,11 +28,21 @@ export function useAdminUsers() {
         _admin_user_id: user.id,
       });
 
-      if (error) throw error;
+      if (error) {
+        if (import.meta.env.DEV) {
+          console.error('Error fetching admin users:', error);
+        }
+        throw error;
+      }
 
       return (data || []) as AdminUser[];
     },
     enabled: !!user,
-    staleTime: 30000,
+    staleTime: QUERY_STALE_TIME.SHORT,
+    retry: (failureCount, error) => {
+      // Don't retry on permission errors
+      if ((error as { code?: string })?.code === 'P0001') return false;
+      return failureCount < 2;
+    },
   });
 }

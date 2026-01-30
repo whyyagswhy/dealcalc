@@ -1,11 +1,10 @@
 import { useAuth } from '@/contexts/AuthContext';
-
-const ADMIN_EMAIL = 'yagnavudathu@gmail.com';
+import { ADMIN } from '@/lib/constants';
 
 export function useAdminAccess() {
   const { user, isLoading } = useAuth();
   
-  const isAdmin = user?.email === ADMIN_EMAIL;
+  const isAdmin = user?.email === ADMIN.EMAIL;
   
   return {
     isAdmin,
