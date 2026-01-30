@@ -128,6 +128,19 @@ export function LineItemRow({
     }
   }, [listUnitPrice]);
 
+  // Apply max L4 discount (called from ApprovalLevelBadge)
+  const handleApplyMaxL4 = useCallback((maxDiscount: number) => {
+    // maxDiscount is a decimal (e.g., 0.20 for 20%)
+    const discountPercentValue = (maxDiscount * 100).toFixed(1);
+    setDiscountPercent(discountPercentValue);
+    
+    const list = parseFloatSafe(listUnitPrice);
+    if (list !== null && list > 0) {
+      const net = list * (1 - maxDiscount);
+      setNetUnitPrice(net.toFixed(2));
+    }
+  }, [listUnitPrice]);
+
   // Auto-compute: net → discount (last edited wins)
   const handleNetChange = useCallback((value: string) => {
     setNetUnitPrice(value);
@@ -309,6 +322,7 @@ export function LineItemRow({
                 productName={productName}
                 quantity={parseIntSafe(quantity) ?? 0}
                 discountPercent={discountPercent ? (parseFloatSafe(discountPercent) ?? 0) / 100 : null}
+                onApplyMaxL4={handleApplyMaxL4}
               />
             )}
           </div>
