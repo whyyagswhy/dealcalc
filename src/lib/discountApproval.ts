@@ -23,26 +23,56 @@ function normalizeProductName(name: string): string {
 }
 
 /**
- * Extract the base product name (category) from a discount matrix name
- * "[Enterprise, Unlimited] Sales Cloud" -> "sales cloud"
+ * Extract the base product name (category) from a product name
+ * Handles both formats:
+ * - Discount matrix: "[Enterprise, Unlimited] Sales Cloud" -> "sales cloud"
+ * - Price book: "Sales Cloud - Enterprise Edition" -> "sales cloud"
  */
 function extractBaseName(productName: string): string {
-  const match = productName.match(/^\[([^\]]+)\]\s*(.+)$/);
-  if (match) {
-    return match[2].trim().toLowerCase();
+  // Format 1: "[Enterprise, Unlimited] Sales Cloud"
+  const bracketMatch = productName.match(/^\[([^\]]+)\]\s*(.+)$/);
+  if (bracketMatch) {
+    return bracketMatch[2].trim().toLowerCase();
   }
+  
+  // Format 2: "Sales Cloud - Enterprise Edition"
+  const dashMatch = productName.match(/^(.+?)\s*-\s*(?:.*?Edition|.*?Add-on|.*?Add On)$/i);
+  if (dashMatch) {
+    return dashMatch[1].trim().toLowerCase();
+  }
+  
+  // Fallback: return as-is
   return productName.trim().toLowerCase();
 }
 
 /**
  * Extract editions from a product name
- * "[Enterprise, Unlimited] Sales Cloud" -> ["enterprise", "unlimited"]
+ * Handles both formats:
+ * - Discount matrix: "[Enterprise, Unlimited] Sales Cloud" -> ["enterprise", "unlimited"]
+ * - Price book: "Sales Cloud - Enterprise Edition" -> ["enterprise"]
  */
 function extractEditions(productName: string): string[] {
-  const match = productName.match(/^\[([^\]]+)\]/);
-  if (match) {
-    return match[1].split(',').map(e => e.trim().toLowerCase());
+  // Format 1: "[Enterprise, Unlimited] Sales Cloud"
+  const bracketMatch = productName.match(/^\[([^\]]+)\]/);
+  if (bracketMatch) {
+    return bracketMatch[1].split(',').map(e => e.trim().toLowerCase());
   }
+  
+  // Format 2: "Sales Cloud - Enterprise Edition" or "Sales Cloud - Einstein 1 Edition"
+  const dashMatch = productName.match(/^.+?\s*-\s*(.+?)\s*Edition$/i);
+  if (dashMatch) {
+    // Normalize edition names: "Einstein 1" -> "einstein 1", "Enterprise" -> "enterprise"
+    const editionStr = dashMatch[1].trim().toLowerCase();
+    // Map common edition patterns
+    if (editionStr.includes('unlimited')) return ['unlimited'];
+    if (editionStr.includes('enterprise')) return ['enterprise'];
+    if (editionStr.includes('professional')) return ['professional'];
+    if (editionStr.includes('essentials')) return ['essentials'];
+    if (editionStr.includes('einstein')) return ['unlimited', 'enterprise']; // Einstein maps to both
+    if (editionStr.includes('agentforce')) return ['unlimited', 'enterprise']; // Agentforce maps to both
+    return [editionStr];
+  }
+  
   return [];
 }
 
