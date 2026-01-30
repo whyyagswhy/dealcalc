@@ -22,12 +22,6 @@ interface MatchedLineItem extends ExtractedLineItem {
   match_confidence: 'high' | 'medium' | 'low' | 'none';
 }
 
-interface ExtractionResult {
-  line_items: MatchedLineItem[];
-  confidence: string;
-  notes: string;
-}
-
 interface PriceBookProduct {
   product_name: string;
   category: string;
@@ -65,34 +59,41 @@ function getMonthlyPrice(product: PriceBookProduct): number {
   return product.annual_list_price / 12;
 }
 
-// Match products to price book using AI
+// Build a price lookup map from price book products
+function buildPriceLookup(priceBookProducts: PriceBookProduct[]): Map<string, number> {
+  const lookup = new Map<string, number>();
+  
+  for (const p of priceBookProducts) {
+    // Add with formatted name [Edition] Category
+    const formattedName = formatProductName(p.category, p.edition);
+    lookup.set(formattedName, getMonthlyPrice(p));
+    
+    // Also add with raw product_name for direct matching
+    lookup.set(p.product_name, getMonthlyPrice(p));
+  }
+  
+  return lookup;
+}
+
+// Match products to BOTH discount_thresholds (for names) and price_book (for prices)
 async function matchProductsToBook(
   lineItems: ExtractedLineItem[],
-  priceBookProducts: PriceBookProduct[],
+  discountProductNames: string[],
+  priceLookup: Map<string, number>,
   apiKey: string
 ): Promise<MatchedLineItem[]> {
   if (lineItems.length === 0) {
     return [];
   }
 
-  // Build a summary of available products for the AI
-  const uniqueProducts = new Map<string, PriceBookProduct>();
-  for (const p of priceBookProducts) {
-    const key = formatProductName(p.category, p.edition);
-    if (!uniqueProducts.has(key)) {
-      uniqueProducts.set(key, p);
-    }
-  }
-
-  const productList = Array.from(uniqueProducts.entries())
-    .map(([name, p]) => `- ${name} ($${getMonthlyPrice(p).toFixed(2)}/mo)`)
-    .join('\n');
+  // Build product list for AI from discount_thresholds (the complete list)
+  const productList = discountProductNames.map(name => `- ${name}`).join('\n');
 
   const extractedList = lineItems
     .map((item, idx) => `${idx + 1}. "${item.product_name}"`)
     .join('\n');
 
-  console.log(`Matching ${lineItems.length} products to ${uniqueProducts.size} price book entries`);
+  console.log(`Matching ${lineItems.length} products to ${discountProductNames.length} discount matrix entries`);
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -105,24 +106,29 @@ async function matchProductsToBook(
       messages: [
         {
           role: 'system',
-          content: `You are matching product names from a sales contract to a Salesforce price book.
-Your task is to find the best match from the price book for each extracted product name.
+          content: `You are matching product names from a sales contract to a Salesforce discount matrix.
+Your task is to find the best match from the official product list for each extracted product name.
 
-The price book uses this naming format: [Edition] Category
-For example: "[Enterprise] Sales Cloud", "[Unlimited] Service Cloud", "[Professional] Einstein Analytics"
+The product list uses this naming format: [Edition(s)] Product Name
+For example: 
+- "[Enterprise, Unlimited] Sales Cloud"
+- "[Professional, Enterprise, Unlimited] Service Cloud"
+- "[Enterprise, Unlimited] CRM Analytics Growth"
 
 Common variations you might see in contracts:
-- "Sales Cloud Enterprise" → "[Enterprise] Sales Cloud"
-- "Salesforce Service - Unlimited" → "[Unlimited] Service Cloud"
-- "SF Sales Enterprise Edition" → "[Enterprise] Sales Cloud"
-- "Platform Plus - Developer" → "[Developer] Platform Plus"
+- "Sales Cloud Enterprise" → "[Enterprise, Unlimited] Sales Cloud" or "[Enterprise] Sales Cloud"
+- "Salesforce Service - Unlimited" → "[Enterprise, Unlimited] Service Cloud"
+- "SF Sales Enterprise Edition" → "[Enterprise, Unlimited] Sales Cloud"
+- "Einstein Analytics Plus" → "[Enterprise, Unlimited] CRM Analytics Plus"
+- "Data Cloud" → "[Enterprise, Unlimited] Customer Data Cloud Starter"
 
 Match based on semantic meaning, not exact string matching.
+Prefer matches that include the edition from the contract (e.g., if contract says "Enterprise", match to a product with Enterprise in the editions).
 If no good match exists (e.g., custom or third-party products), return null for the match.`
         },
         {
           role: 'user',
-          content: `Price Book Products:\n${productList}\n\nExtracted Products to Match:\n${extractedList}\n\nFor each extracted product, find the best match from the price book.`
+          content: `Official Product List:\n${productList}\n\nExtracted Products to Match:\n${extractedList}\n\nFor each extracted product, find the best match from the official product list.`
         }
       ],
       tools: [
@@ -130,7 +136,7 @@ If no good match exists (e.g., custom or third-party products), return null for 
           type: 'function',
           function: {
             name: 'match_products',
-            description: 'Match extracted product names to price book entries',
+            description: 'Match extracted product names to official discount matrix entries',
             parameters: {
               type: 'object',
               properties: {
@@ -143,7 +149,7 @@ If no good match exists (e.g., custom or third-party products), return null for 
                       matched_name: {
                         type: 'string',
                         nullable: true,
-                        description: 'The matched product name from price book in [Edition] Category format, or null if no match'
+                        description: 'The matched product name from the official list, or null if no match'
                       },
                       confidence: {
                         type: 'string',
@@ -199,12 +205,26 @@ If no good match exists (e.g., custom or third-party products), return null for 
     const matchedName = match?.matched_name || null;
     const confidence = match?.confidence || 'none';
     
-    // Find the matched product in the price book to get its price
+    // Try to find a list price from the price book
     let matchedPrice: number | null = null;
     if (matchedName) {
-      const product = uniqueProducts.get(matchedName);
-      if (product) {
-        matchedPrice = getMonthlyPrice(product);
+      // First try exact match on the matched name
+      matchedPrice = priceLookup.get(matchedName) ?? null;
+      
+      // If not found, try to find a partial match by extracting category
+      if (matchedPrice === null) {
+        // Extract the base product name (after the edition brackets)
+        const baseNameMatch = matchedName.match(/\]\s*(.+)$/);
+        if (baseNameMatch) {
+          const baseName = baseNameMatch[1].trim();
+          // Try common variations
+          for (const [key, price] of priceLookup.entries()) {
+            if (key.includes(baseName) || baseName.includes(key.replace(/\[.*?\]\s*/, ''))) {
+              matchedPrice = price;
+              break;
+            }
+          }
+        }
       }
     }
 
@@ -216,7 +236,7 @@ If no good match exists (e.g., custom or third-party products), return null for 
       match_confidence: confidence as 'high' | 'medium' | 'low' | 'none',
       // If matched, use the matched name as product_name for the final result
       product_name: matchedName || item.product_name,
-      // If matched and confidence is high/medium, use price book price
+      // If matched and confidence is high/medium and we have a price, use price book price
       list_unit_price: (matchedPrice !== null && (confidence === 'high' || confidence === 'medium')) 
         ? matchedPrice 
         : item.list_unit_price,
@@ -291,16 +311,34 @@ serve(async (req) => {
     const isPdf = mimeType === 'application/pdf';
     console.log(`Processing contract ${isPdf ? 'PDF' : 'image'} for extraction...`);
 
-    // Fetch price book products for matching
-    console.log('Fetching price book products...');
-    const { data: priceBookProducts, error: pbError } = await supabaseClient
-      .from('price_book_products')
-      .select('product_name, category, edition, monthly_list_price, annual_list_price');
+    // Fetch BOTH price book products AND discount thresholds in parallel
+    console.log('Fetching price book and discount matrix products...');
+    const [priceBookResult, discountResult] = await Promise.all([
+      supabaseClient
+        .from('price_book_products')
+        .select('product_name, category, edition, monthly_list_price, annual_list_price'),
+      supabaseClient
+        .from('discount_thresholds')
+        .select('product_name')
+    ]);
     
-    if (pbError) {
-      console.error('Failed to fetch price book:', pbError.message);
+    if (priceBookResult.error) {
+      console.error('Failed to fetch price book:', priceBookResult.error.message);
     }
-    console.log(`Fetched ${priceBookProducts?.length || 0} price book products`);
+    if (discountResult.error) {
+      console.error('Failed to fetch discount thresholds:', discountResult.error.message);
+    }
+
+    const priceBookProducts = priceBookResult.data || [];
+    const discountThresholds = discountResult.data || [];
+    
+    // Get unique product names from discount_thresholds
+    const discountProductNames = [...new Set(discountThresholds.map(d => d.product_name))].sort();
+    
+    // Build price lookup from price book
+    const priceLookup = buildPriceLookup(priceBookProducts as PriceBookProduct[]);
+    
+    console.log(`Fetched ${priceBookProducts.length} price book products, ${discountProductNames.length} unique discount matrix products`);
 
     // Prepare the file URL
     const fileUrl = file_base64.startsWith('data:') 
@@ -451,19 +489,20 @@ Important:
     const extractedData = JSON.parse(toolCall.function.arguments);
     console.log(`Extracted ${extractedData.line_items.length} line items with ${extractedData.confidence} confidence`);
 
-    // Step 2: Match products to price book
+    // Step 2: Match products using discount_thresholds names and price_book for prices
     let matchedLineItems: MatchedLineItem[];
-    if (priceBookProducts && priceBookProducts.length > 0 && extractedData.line_items.length > 0) {
-      console.log('Starting product matching...');
+    if (discountProductNames.length > 0 && extractedData.line_items.length > 0) {
+      console.log('Starting product matching against discount matrix...');
       matchedLineItems = await matchProductsToBook(
         extractedData.line_items,
-        priceBookProducts as PriceBookProduct[],
+        discountProductNames,
+        priceLookup,
         LOVABLE_API_KEY
       );
       const matchedCount = matchedLineItems.filter(i => i.match_confidence !== 'none').length;
-      console.log(`Matched ${matchedCount}/${matchedLineItems.length} products to price book`);
+      console.log(`Matched ${matchedCount}/${matchedLineItems.length} products to discount matrix`);
     } else {
-      // No price book or no items to match
+      // No discount products or no items to match
       matchedLineItems = extractedData.line_items.map((item: ExtractedLineItem) => ({
         ...item,
         original_product_name: item.product_name,
